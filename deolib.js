@@ -121,7 +121,6 @@ function InitWindow(width, height, title) {
 
   _ctx.textAlign = "left";
   _ctx.textBaseline = "top";
-  _ctx.font = "20px grixel";
 
   document.body.appendChild(_canvas);
   document.title = title;
