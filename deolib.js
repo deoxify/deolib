@@ -1,3 +1,21 @@
+class Vector2 {
+  constructor(x = 0, y = 0) {
+    Object.assign(this, { x, y });
+  }
+}
+
+class Circle {
+  constructor(center, radius) {
+    Object.assign(this, { center, radius });
+  }
+}
+
+class Rectangle {
+  constructor(x, y, width, height) {
+    Object.assign(this, { x, y, width, height });
+  }
+}
+
 let _ctx;
 let _firstTime = performance.now();
 let _lastTime = performance.now();
@@ -62,9 +80,12 @@ const IsKeyDown = keyCode => keyCode in _keyboard && _keyboard[keyCode];
 const IsKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
 const IsKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
 const IsKeyReleased = keyCode => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
-const GetMousePosition = () => ({ x: _mouse.x, y: _mouse.y });
+const GetMousePosition = () => ({x: _mouse.x, y: _mouse.y});
+const GetMouseX = () => _mouse.x;
+const GetMouseY = () => _mouse.y;
 const GetScreenWidth = () => _ctx.canvas.width;
 const GetScreenHeight = () => _ctx.canvas.height;
+const GetScreenRect = () => _canvasRect;
 const GetFrameTime = () => _deltaTime;
 const GetFPS = () => Math.floor(_fps);
 const GetTime = () => (performance.now() - _firstTime) / 1000;
@@ -103,7 +124,6 @@ function InitWindow(width, height, title) {
   };
 
   Object.assign(_canvas.style, {
-    border: "3px double gray",
     maxWidth: "100vw",
     maxHeight: "100vh"
   });
@@ -113,6 +133,7 @@ function InitWindow(width, height, title) {
     width: "100vw",
     height: "100vh",
     margin: "0",
+    padding: "0",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -126,118 +147,14 @@ function InitWindow(width, height, title) {
   document.title = title;
 
   window.onload = () => {
-    if (typeof main === "function") {
       _canvasRect = new Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
       SetFont("bold 20px monospace, system");
+    if (typeof main === "function") {
       _startGameLoop(main);
     } else {
       console.warn("main() missing");
     }
   };
-}
-
-class Vector2 {
-  constructor(x = 0, y = 0) {
-    Object.assign(this, { x, y });
-  }
-}
-
-class Circle {
-  constructor(center, radius) {
-    Object.assign(this, { center, radius });
-  }
-}
-
-class Rectangle {
-  constructor(x, y, width, height) {
-    Object.assign(this, { x, y, width, height });
-  }
-}
-
-class _TestObject {
-  static _objects = [];
-
-  constructor() {
-    this.color = GetRandomColor();
-    const size = GetRandomValue(_ctx.canvas.width / 64, _ctx.canvas.width / 16);
-    const x = GetRandomValue(size, _ctx.canvas.width - size);
-    const y = GetRandomValue(size, _ctx.canvas.height - size);
-
-    this.shape = Math.random() < 0.5 ? new Circle(new Vector2(x, y), size) : new Rectangle(x, y, size, size);
-    this.hallow = Math.random() < 0.5;
-    if (this.hallow) this.thickness = GetRandomValue(size / 8, size / 4);
-
-    const getSpeed = (min, max) => GetRandomValue(min, max) * (Math.random() < 0.5 ? -1 : 1);
-    this.vx = getSpeed(_ctx.canvas.width / 8, _ctx.canvas.width / 2);
-    this.vy = getSpeed(_ctx.canvas.height / 8, _ctx.canvas.height / 2);
-  }
-
-  render() {
-    const canvasRect = new Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
-    const dx = this.vx * _deltaTime,
-      dy = this.vy * _deltaTime;
-
-    if (this.shape instanceof Circle) {
-      this.hallow
-        ? DrawCircleLinesEx(this.shape, this.thickness, this.color)
-        : DrawCircle(this.shape.center.x, this.shape.center.y, this.shape.radius, this.color);
-
-      this._handleCircleCollision(canvasRect, dx, dy);
-    } else if (this.shape instanceof Rectangle) {
-      this.hallow
-        ? DrawRectangleLinesEx(this.shape, this.thickness, this.color)
-        : DrawRectangleRec(this.shape, this.color);
-
-      this._handleRectangleCollision(canvasRect, dx, dy);
-    }
-  }
-
-  _handleCircleCollision(rect, dx, dy) {
-    const c = this.shape.center,
-      r = this.shape.radius;
-
-    if (c.x - r + dx < 0) {
-      c.x = r;
-      this.vx = -this.vx;
-    } else if (c.x + r + dx > rect.width) {
-      c.x = rect.width - r;
-      this.vx = -this.vx;
-    }
-
-    if (c.y - r + dy < 0) {
-      c.y = r;
-      this.vy = -this.vy;
-    } else if (c.y + r + dy > rect.height) {
-      c.y = rect.height - r;
-      this.vy = -this.vy;
-    }
-
-    c.x += dx;
-    c.y += dy;
-  }
-
-  _handleRectangleCollision(rect, dx, dy) {
-    const s = this.shape;
-
-    if (s.x + dx < 0) {
-      s.x = 0;
-      this.vx = -this.vx;
-    } else if (s.x + s.width + dx > rect.width) {
-      s.x = rect.width - s.width;
-      this.vx = -this.vx;
-    }
-
-    if (s.y + dy < 0) {
-      s.y = 0;
-      this.vy = -this.vy;
-    } else if (s.y + s.height + dy > rect.height) {
-      s.y = rect.height - s.height;
-      this.vy = -this.vy;
-    }
-
-    s.x += dx;
-    s.y += dy;
-  }
 }
 
 function CheckCollisionRecs(rect1, rect2) {
@@ -252,14 +169,6 @@ function CheckCollisionCircleRec(circle, rect) {
   const dx = circle.center.x - Math.max(rect.x, Math.min(circle.center.x, rect.x + rect.width));
   const dy = circle.center.y - Math.max(rect.y, Math.min(circle.center.y, rect.y + rect.height));
   return dx * dx + dy * dy <= circle.radius * circle.radius;
-}
-
-function AddTestObjects(count) {
-  for (let i = 0; i < count; ++i) _TestObject._objects.push(new _TestObject());
-}
-
-function RenderTestObjects() {
-  for (const obj of _TestObject._objects) obj.render();
 }
 
 function _startGameLoop(callback) {
@@ -414,4 +323,98 @@ function DrawText(text, x, y, { size, color, align, baseline, weight, style, fon
   }
   _ctx.fillText(text, x, y);
   _ctx.restore();
+}
+
+class _TestObject {
+  static _objects = [];
+
+  constructor() {
+    this.color = GetRandomColor();
+    const size = GetRandomValue(_ctx.canvas.width / 64, _ctx.canvas.width / 16);
+    const x = GetRandomValue(size, _ctx.canvas.width - size);
+    const y = GetRandomValue(size, _ctx.canvas.height - size);
+
+    this.shape = Math.random() < 0.5 ? new Circle(new Vector2(x, y), size) : new Rectangle(x, y, size, size);
+    this.hallow = Math.random() < 0.5;
+    if (this.hallow) this.thickness = GetRandomValue(size / 8, size / 4);
+
+    const getSpeed = (min, max) => GetRandomValue(min, max) * (Math.random() < 0.5 ? -1 : 1);
+    this.vx = getSpeed(_ctx.canvas.width / 8, _ctx.canvas.width / 2);
+    this.vy = getSpeed(_ctx.canvas.height / 8, _ctx.canvas.height / 2);
+  }
+
+  _render() {
+    const canvasRect = new Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
+    const dx = this.vx * _deltaTime,
+      dy = this.vy * _deltaTime;
+
+    if (this.shape instanceof Circle) {
+      this.hallow
+        ? DrawCircleLinesEx(this.shape, this.thickness, this.color)
+        : DrawCircle(this.shape.center.x, this.shape.center.y, this.shape.radius, this.color);
+
+      this._handleCircleCollision(canvasRect, dx, dy);
+    } else if (this.shape instanceof Rectangle) {
+      this.hallow
+        ? DrawRectangleLinesEx(this.shape, this.thickness, this.color)
+        : DrawRectangleRec(this.shape, this.color);
+
+      this._handleRectangleCollision(canvasRect, dx, dy);
+    }
+  }
+
+  _handleCircleCollision(rect, dx, dy) {
+    const c = this.shape.center,
+      r = this.shape.radius;
+
+    if (c.x - r + dx < 0) {
+      c.x = r;
+      this.vx = -this.vx;
+    } else if (c.x + r + dx > rect.width) {
+      c.x = rect.width - r;
+      this.vx = -this.vx;
+    }
+
+    if (c.y - r + dy < 0) {
+      c.y = r;
+      this.vy = -this.vy;
+    } else if (c.y + r + dy > rect.height) {
+      c.y = rect.height - r;
+      this.vy = -this.vy;
+    }
+
+    c.x += dx;
+    c.y += dy;
+  }
+
+  _handleRectangleCollision(rect, dx, dy) {
+    const s = this.shape;
+
+    if (s.x + dx < 0) {
+      s.x = 0;
+      this.vx = -this.vx;
+    } else if (s.x + s.width + dx > rect.width) {
+      s.x = rect.width - s.width;
+      this.vx = -this.vx;
+    }
+
+    if (s.y + dy < 0) {
+      s.y = 0;
+      this.vy = -this.vy;
+    } else if (s.y + s.height + dy > rect.height) {
+      s.y = rect.height - s.height;
+      this.vy = -this.vy;
+    }
+
+    s.x += dx;
+    s.y += dy;
+  }
+}
+
+function AddTestObjects(count) {
+  for (let i = 0; i < count; ++i) _TestObject._objects.push(new _TestObject());
+}
+
+function RenderTestObjects() {
+  for (const obj of _TestObject._objects) obj._render();
 }
