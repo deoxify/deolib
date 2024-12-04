@@ -23,6 +23,7 @@ let _deltaTime = 0;
 let _fps = 0;
 let _fpsUpdateInterval = 250;
 let _fpsFontSize;
+let _cachedFont;
 let _canvasRect;
 let _mouseInCanvas;
 
@@ -232,7 +233,7 @@ const DrawFPS = (() => {
       lastFPS = GetFPS();
       FPSTimer = 0;
     }
-    DrawText(`${lastFPS} FPS`, x, y, { weight: 900, size: _fpsFontSize, color: DARKGREEN });
+    DrawText(`${lastFPS} FPS`, x, y, _fpsFontSize, DARKGREEN, {weight: 900});
   };
 })();
 
@@ -305,19 +306,23 @@ function DrawCircleLinesEx(circle, thickness, color) {
 }
 
 function SetFont(fontStr) {
-  _ctx.font = fontStr.trim();
+  _ctx.font = _cachedFont= fontStr.trim();
   _ctx.fillText("cache", -9999, -9999);
 }
 
-function DrawText(text, x, y, { size, color, align, baseline, weight, style, font } = {}) {
-  if (!text) return;
+function DrawText(text, x, y, size = null, color = null, { align, baseline, weight, style, font } = {}) {
+  if (!String(text).length) return;
   _ctx.save();
-  if (color) _ctx.fillStyle = color;
-  if (align) _ctx.textAlign = align;
-  if (baseline) _ctx.textBaseline = baseline;
+  if (color && _ctx.fillStyle !== color) _ctx.fillStyle = color;
+  if (align && _ctx.textAlign !== align) _ctx.textAlign = align;
+  if (baseline && _ctx.textBaseline !== baseline) _ctx.textBaseline = baseline;
   if (size || weight || style || font) {
     const fontFamily = font || _ctx.font.split("px")[1];
-    _ctx.font = `${style || ""} ${weight || ""} ${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
+    const newFont = `${style || ""} ${weight || ""} ${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
+    if (_cachedFont !== newFont) {
+      _ctx.font = newFont;
+      _cachedFont = newFont;
+    }
   }
   _ctx.fillText(text, x, y);
   _ctx.restore();
