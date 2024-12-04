@@ -24,6 +24,7 @@ let _fps = 0;
 let _fpsUpdateInterval = 250;
 let _fpsFontSize;
 let _canvasRect;
+let _mouseInCanvas;
 
 const LIGHTGRAY = "#c8c8c8";
 const GRAY = "#828282";
@@ -62,7 +63,11 @@ const _mouse = {
   [MOUSE_LEFT_BUTTON]: false,
   [MOUSE_MIDDLE_BUTTON]: false,
   [MOUSE_RIGHT_BUTTON]: false,
-  prev: {}
+  prev: {
+    [MOUSE_LEFT_BUTTON]: false,
+    [MOUSE_MIDDLE_BUTTON]: false,
+    [MOUSE_RIGHT_BUTTON]: false,
+  }
 };
 
 const _keyboard = {
@@ -96,34 +101,24 @@ function InitWindow(width, height, title) {
   _ctx = _canvas.getContext("2d");
   _fpsFontSize = Math.floor((_ctx.canvas.width + _ctx.canvas.height) / 64);
   _canvas.oncontextmenu = e => e.preventDefault();
+  _canvas.onmouseenter = () => _mouseInCanvas = true;
+  _canvas.onmouseleave = () => _mouseInCanvas = false;
   _canvas.onmousemove = e => {
     const rect = _canvas.getBoundingClientRect();
     _mouse.x = Math.floor(e.clientX - rect.left);
     _mouse.y = Math.floor(e.clientY - rect.top);
   };
   _canvas.onmousedown = e => {
-    if (e.button in _mouse) _mouse[e.button] = true;
+      if (_mouseInCanvas) _mouse[e.button] = true;
   };
   _canvas.onmouseup = e => {
-    if (e.button in _mouse) _mouse[e.button] = false;
-  };
-  _canvas.onmouseleave = () => {
-    for (const buttonId in _mouse) {
-      _mouse[buttonId] = false;
-      _mouse.prev[buttonId] = false;
-    }
+      if (_mouseInCanvas) _mouse[e.button] = false;
   };
   window.onkeydown = e => {
     if (e.code.length) _keyboard[e.code] = true;
   };
   window.onkeyup = e => {
     if (e.code in _keyboard) _keyboard[e.code] = false;
-  };
-  window.onblur = () => {
-    isPageFocused = false;
-  };
-  window.onfocus = () => {
-    isPageFocused = true;
   };
 
   Object.assign(_canvas.style, {
@@ -193,12 +188,12 @@ function _startGameLoop(callback) {
     const now = performance.now();
     _deltaTime = (now - _lastTime) / 1000;
     _lastTime = now;
-    _updatePrevMouseState();
-    _updatePrevKeyboardState();
 
     if (isPageVisible) {
       _fps = 1 / _deltaTime;
       callback();
+      _updatePrevMouseState();
+      _updatePrevKeyboardState();
       frameRef = requestAnimationFrame(loop);
     }
   }
@@ -268,7 +263,7 @@ function DrawRectangleLinesEx(rect, thickness, color) {
 }
 
 function CheckCollisionPointRec(point, rect) {
-  return point.x > rect.x && point.y > rect.y && point.x < rect.x + rect.w && point.y < rect.y + rect.h;
+  return point.x > rect.x && point.y > rect.y && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
 }
 
 function DrawLine(x1, y1, x2, y2, color, thickness) {
@@ -414,7 +409,7 @@ class _TestObject {
   }
 }
 
-function AddTestObjects(count) {
+function AddTestObjects(count = 1) {
   for (let i = 0; i < count; ++i) _TestObject._objects.push(new _TestObject());
 }
 
