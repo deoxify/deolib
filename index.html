@@ -8,29 +8,24 @@
   </head>
   <body>
     <script>
+      // Initialization
       const screenWidth = 800;
       const screenHeight = 450;
-
       InitWindow(screenWidth, screenHeight, "Basic example");
 
       // Main game loop
       const main = () => {
-
-      	// Update
+        // Update
         //----------------------------------------------------------------------------------
-      	if(IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-      	  AddTestObjects(1);
-      	}
         //----------------------------------------------------------------------------------
 
         // Draw
         //----------------------------------------------------------------------------------
-      	ClearBackground("#050505");
-        DrawText("Lorem ipsum dolor sit amet", 150, 200, 36, LIGHTGRAY);
-        RenderTestObjects();
+        ClearBackground(LIGHTGRAY);
+        DrawText("Lorem ipsum dolor sit amet", 150, 200, 36, BLACK);
         DrawFPS(10, 10);
         //----------------------------------------------------------------------------------
-      }
+      };
     </script>
   </body>
 </html>
