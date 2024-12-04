@@ -108,7 +108,10 @@ function InitWindow(width, height, title) {
     if (e.button in _mouse) _mouse[e.button] = false;
   };
   _canvas.onmouseleave = () => {
-    for (const buttonId in _mouse) _mouse[buttonId] = false;
+    for (const buttonId in _mouse) {
+      _mouse[buttonId] = false;
+      _mouse.prev[buttonId] = false;
+    }
   };
   window.onkeydown = e => {
     if (e.code.length) _keyboard[e.code] = true;
@@ -190,12 +193,12 @@ function _startGameLoop(callback) {
     const now = performance.now();
     _deltaTime = (now - _lastTime) / 1000;
     _lastTime = now;
+    _updatePrevMouseState();
+    _updatePrevKeyboardState();
 
     if (isPageVisible) {
       _fps = 1 / _deltaTime;
       callback();
-      _updatePrevMouseState();
-      _updatePrevKeyboardState();
       frameRef = requestAnimationFrame(loop);
     }
   }
