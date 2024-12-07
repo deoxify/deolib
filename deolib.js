@@ -2,6 +2,15 @@ class Vector2 {
   constructor(x = 0, y = 0) {
     Object.assign(this, { x, y });
   }
+  add(other) {
+    return new Vector2(this.x + other.x, this.y + other.y);
+  }
+  subtract(other) {
+    return new Vector2(this.x - other.x, this.y - other.y);
+  }
+  clone() {
+    return new Vector2(this.x, this.y);
+  }
 }
 
 class Circle {
@@ -27,6 +36,8 @@ let _fpsFontSize;
 let _cachedFont;
 let _canvasRect;
 let _mouseInCanvas;
+let _imageCache = {};
+let _spriteCache = new Map();
 
 const LIGHTGRAY = "#c8c8c8";
 const GRAY = "#828282";
@@ -45,6 +56,7 @@ const SKYBLUE = "#66bfff";
 const BLUE = "#0079f1";
 const DARKBLUE = "#0052ac";
 const PURPLE = "#c87aff";
+const CYAN = "#00FFFF";
 const VIOLET = "#873cbe";
 const DARKPURPLE = "#701f7e";
 const BEIGE = "#d3b083";
@@ -76,9 +88,6 @@ const _keyboard = {
   prev: {}
 };
 
-const GetRandomValue = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const GetRandomElem = arr => arr[GetRandomValue(0, arr.length)];
-const GetRandomColor = () => "#" + ((Math.random() * 0xffffff) << 0).toString(16);
 const IsMouseButtonDown = buttonId => buttonId in _mouse && _mouse[buttonId];
 const IsMouseButtonUp = buttonId => buttonId in _mouse && !_mouse[buttonId];
 const IsMouseButtonPressed = buttonId => buttonId in _mouse && !_mouse.prev[buttonId] && _mouse[buttonId];
@@ -87,6 +96,9 @@ const IsKeyDown = keyCode => keyCode in _keyboard && _keyboard[keyCode];
 const IsKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
 const IsKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
 const IsKeyReleased = keyCode => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
+const GetRandomValue = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const GetRandomElem = arr => arr[GetRandomValue(0, arr.length)];
+const GetRandomColor = () => "#" + ((Math.random() * 0xffffff) << 0).toString(16);
 const GetMousePosition = () => ({ x: _mouse.x, y: _mouse.y });
 const GetMouseX = () => _mouse.x;
 const GetMouseY = () => _mouse.y;
@@ -107,8 +119,10 @@ function InitWindow(width, height, title) {
   _canvas.onmouseleave = () => (_mouseInCanvas = false);
   _canvas.onmousemove = e => {
     const rect = _canvas.getBoundingClientRect();
-    _mouse.x = Math.floor(e.clientX - rect.left);
-    _mouse.y = Math.floor(e.clientY - rect.top);
+    const scaleX = _canvas.width / rect.width;
+    const scaleY = _canvas.height / rect.height;
+    _mouse.x = Math.floor((e.clientX - rect.left) * scaleX);
+    _mouse.y = Math.floor((e.clientY - rect.top) * scaleY);
   };
   _canvas.onmousedown = e => {
     if (_mouseInCanvas) _mouse[e.button] = true;
@@ -129,7 +143,7 @@ function InitWindow(width, height, title) {
   });
 
   Object.assign(document.body.style, {
-    backgroundColor: "#111111",
+    backgroundColor: "#282828",
     width: "100vw",
     height: "100vh",
     margin: "0",
@@ -158,6 +172,91 @@ function InitWindow(width, height, title) {
       console.warn("main() missing");
     }
   };
+}
+
+function LoadImage(filename) {
+  if (_imageCache[filename]) return _imageCache[filename];
+
+  const placeholder = new Image();
+  placeholder.src = "";
+
+  const img = new Image();
+  img.onload = () => {
+    _imageCache[filename] = img;
+    Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
+  };
+  img.onerror = err => console.error(`Failed to load image: ${filename}`, err);
+  img.src = filename;
+
+  _imageCache[filename] = placeholder;
+  return placeholder;
+}
+
+function LoadSpreadSheet(filename, spriteWidth, spriteHeight) {
+  if (_imageCache[filename]) return _imageCache[filename];
+
+  const placeholder = new Image();
+  placeholder.src = "";
+
+  const img = new Image();
+  img.onload = () => {
+    _imageCache[filename] = Object.assign(img, { spriteWidth, spriteHeight });
+    Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
+  };
+  img.onerror = err => console.error(`Failed to load image: ${filename}`, err);
+  img.src = filename;
+
+  _imageCache[filename] = Object.assign(placeholder, { spriteWidth, spriteHeight });
+  return _imageCache[filename];
+}
+
+function DrawSprite(
+  spriteSheet,
+  colIndex,
+  rowIndex,
+  destX,
+  destY,
+  destWidth = spriteSheet.spriteWidth,
+  destHeight = spriteSheet.spriteHeight
+) {
+  const { spriteWidth, spriteHeight } = spriteSheet;
+
+  const cacheKey = `${spriteSheet.src}_${spriteWidth}_${spriteHeight}_${colIndex - 1}_${rowIndex - 1}`;
+
+  if (!_spriteCache.has(cacheKey)) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = spriteWidth;
+    canvas.height = spriteHeight;
+
+    const sourceX = (colIndex - 1) * spriteWidth;
+    const sourceY = (rowIndex - 1) * spriteHeight;
+    ctx.drawImage(spriteSheet, sourceX, sourceY, spriteWidth, spriteHeight, 0, 0, spriteWidth, spriteHeight);
+
+    const sprite = new Image();
+    sprite.src = canvas.toDataURL();
+    _spriteCache.set(cacheKey, sprite);
+  }
+
+  const cachedSprite = _spriteCache.get(cacheKey);
+  _ctx.drawImage(cachedSprite, destX, destY, destWidth, destHeight);
+}
+
+function DrawImage(img, dx, dy) {
+  _ctx.drawImage(img, dx, dy);
+}
+
+function DrawImageEx(img, sx, sy, sw, sh, dx, dy, dw, dh) {
+  _ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
+function DrawImageRec(img, rect) {
+  _ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
+}
+
+function ToggleFullScreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+  else document.exitFullscreen();
 }
 
 function CheckCollisionRecs(rect1, rect2) {
@@ -268,12 +367,12 @@ function DrawRectangleLinesRec(rect, color) {
 }
 
 function DrawRectangleLinesEx(rect, thickness, color) {
-  const x = rect.x + thickness * 0.5;
-  const y = rect.y + thickness * 0.5;
+  const x = rect.x + thickness;
+  const y = rect.y + thickness;
   _ctx.save();
   _ctx.strokeStyle = color;
-  _ctx.lineWidth = thickness;
-  _ctx.strokeRect(x, y, rect.width - thickness, rect.height - thickness);
+  SetLineThick(thickness);
+  _ctx.strokeRect(x, y, rect.width - thickness * 2, rect.height - thickness * 2);
   _ctx.restore();
 }
 
@@ -293,15 +392,15 @@ function DrawRectangleRoundedLines(rect, roundness, color) {
 
 function DrawRectangleRoundedLinesEx(rect, roundness, thickness, color) {
   _ctx.save();
-  _ctx.lineWidth = thickness;
+  SetLineThick(thickness);
   DrawRectangleRoundedLines(rect, roundness, color);
   _ctx.restore();
 }
 
-function DrawSquareGrid(x, y, cols, rows, cellSize, color = LIGHTGRAY, thickness = 2) {
+function DrawSquareGrid(x, y, cols, rows, cellSize, color = LIGHTGRAY, thickness = 1) {
   _ctx.save();
   _ctx.strokeStyle = color;
-  _ctx.lineWidth = thickness;
+  SetLineThick(thickness);
 
   _ctx.beginPath();
   for (let i = 0; i <= cols; i++) {
@@ -329,7 +428,7 @@ function DrawLine(x1, y1, x2, y2, color, thickness) {
   _ctx.lineTo(x2, y2);
   if (thickness && _ctx.lineWidth !== thickness) {
     _ctx.save();
-    _ctx.lineWidth = thickness;
+    SetLineThick(thickness);
   }
   _ctx.stroke();
   if (thickness && _ctx.lineWidth !== thickness) {
@@ -395,6 +494,16 @@ function DrawTriangle(v1, v2, v3, color) {
   _ctx.closePath();
   _ctx.fillStyle = color;
   _ctx.fill();
+}
+
+function DrawTriangleLines(v1, v2, v3, color) {
+  _ctx.beginPath();
+  _ctx.moveTo(v1.x, v1.y);
+  _ctx.lineTo(v2.x, v2.y);
+  _ctx.lineTo(v3.x, v3.y);
+  _ctx.closePath();
+  _ctx.strokeStyle = color;
+  _ctx.stroke();
 }
 
 function SetFont(newFont) {
