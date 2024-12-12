@@ -97,7 +97,7 @@ const IsKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
 const IsKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
 const IsKeyReleased = keyCode => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
 const GetRandomValue = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const GetRandomElem = arr => arr[GetRandomValue(0, arr.length)];
+const GetRandomElem = arr => arr[GetRandomValue(0, arr.length - 1)];
 const GetRandomColor = () => "#" + ((Math.random() * 0xffffff) << 0).toString(16);
 const GetMousePosition = () => ({ x: _mouse.x, y: _mouse.y });
 const GetMouseX = () => _mouse.x;
