@@ -682,10 +682,7 @@ function Button(bounds, text, fontSize = null) {
   DrawRectangleRec(bounds, innerColor);
   DrawRectangleLinesRec(bounds, outerColor);
   fontSize = fontSize || Math.min(bounds.height, bounds.width / text.length);
-  DrawText(text, textPos.x, textPos.y, fontSize, textColor, {
-    align: "center",
-    baseline: "middle"
-  });
+  DrawTextCentered(text, textPos.x, textPos.y, fontSize, textColor);
 
   return clicked;
 }
