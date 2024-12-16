@@ -1,28 +1,25 @@
-class Vector2 {
-  constructor(x = 0, y = 0) {
-    Object.assign(this, { x, y });
-  }
-  add(other) {
-    return new Vector2(this.x + other.x, this.y + other.y);
-  }
-  subtract(other) {
-    return new Vector2(this.x - other.x, this.y - other.y);
-  }
-  clone() {
-    return new Vector2(this.x, this.y);
-  }
+function Vector2(x = 0, y = 0) {
+  return { x, y };
 }
 
-class Circle {
-  constructor(center, radius) {
-    Object.assign(this, { center, radius });
-  }
+function Vector2Add(v1, v2) {
+  return Vector2(v1.x + v2.x, v1.y + v2.y);
 }
 
-class Rectangle {
-  constructor(x, y, width, height) {
-    Object.assign(this, { x, y, width, height });
-  }
+function Vector2Subtract(v1, v2) {
+  return Vector2(v1.x - v2.x, v1.y - v2.y);
+}
+
+function Vector2Half(v) {
+  return Vector2(v.x / 2, v.y / 2);
+}
+
+function Rectangle(x, y, width, height) {
+  return { x, y, width, height };
+}
+
+function Circle(center, radius) {
+  return { center, radius };
 }
 
 let _ctx;
@@ -31,6 +28,8 @@ let _lastTime;
 let _frameTime = 0;
 let _fps = 0;
 let _avgFPS = 0;
+let _fpsSamples = [];
+let _maxSamples = 20;
 let _fpsUpdateInterval = 250;
 let _fpsFontSize;
 let _cachedFont;
@@ -42,7 +41,7 @@ let _spriteCache = new Map();
 const LIGHTGRAY = "#c8c8c8";
 const GRAY = "#828282";
 const DARKGRAY = "#505050";
-const DEOGRAY = "#101010";
+const COAL = "#101010";
 const YELLOW = "#fdf900";
 const GOLD = "#ffcb00";
 const ORANGE = "#ffa100";
@@ -67,13 +66,18 @@ const BLACK = "#000000";
 const BLANK = "#00000000";
 const MAGENTA = "#ff00ff";
 
+const CUR_DEFAULT = "default";
+const CUR_CROSSHAIR = "crosshair";
+const CUR_POINTER = "pointer";
+
 const MOUSE_LEFT_BUTTON = 0;
 const MOUSE_MIDDLE_BUTTON = 1;
 const MOUSE_RIGHT_BUTTON = 2;
 
 const _mouse = {
-  x: 0,
-  y: 0,
+  x: -1,
+  y: -1,
+  isInCanvas: false,
   [MOUSE_LEFT_BUTTON]: false,
   [MOUSE_MIDDLE_BUTTON]: false,
   [MOUSE_RIGHT_BUTTON]: false,
@@ -96,27 +100,28 @@ const IsKeyDown = keyCode => keyCode in _keyboard && _keyboard[keyCode];
 const IsKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
 const IsKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
 const IsKeyReleased = keyCode => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
-const GetRandomValue = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const GetRandomElem = arr => arr[GetRandomValue(0, arr.length - 1)];
+const GetRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const GetRandomFloat = (min, max) => Math.random() * (max - min) + min;
+const GetRandomElem = arr => arr[GetRandomInt(0, arr.length - 1)];
 const GetRandomColor = () => "#" + ((Math.random() * 0xffffff) << 0).toString(16);
-const GetMousePosition = () => ({ x: _mouse.x, y: _mouse.y });
+const GetMousePosition = () => Vector2(_mouse.x, _mouse.y);
 const GetMouseX = () => _mouse.x;
 const GetMouseY = () => _mouse.y;
-const GetScreenWidth = () => _ctx.canvas.width;
-const GetScreenHeight = () => _ctx.canvas.height;
-const GetScreenRect = () => _canvasRect;
+const GetCanvasWidth = () => _ctx.canvas.width;
+const GetCanvasHeight = () => _ctx.canvas.height;
+const GetCanvasRect = () => _canvasRect;
 const GetFrameTime = () => _frameTime;
 const GetFPS = () => _fps;
 const GetTime = () => (performance.now() - _firstTime) / 1000;
 
-function InitWindow(width, height, title) {
+function InitCanvas(width, height, title) {
   const _canvas = document.createElement("canvas");
   _ctx = _canvas.getContext("2d");
-  _canvas.width = width;
-  _canvas.height = height;
+  _canvas.width = Math.floor(width);
+  _canvas.height = Math.floor(height);
   _canvas.oncontextmenu = e => e.preventDefault();
-  _canvas.onmouseenter = () => (_mouseInCanvas = true);
-  _canvas.onmouseleave = () => (_mouseInCanvas = false);
+  _canvas.onmouseenter = () => (_mouse.isInCanvas = true);
+  _canvas.onmouseleave = () => ((_mouse.isInCanvas = false), (_mouse.x = -1), (_mouse.y = -1));
   _canvas.onmousemove = e => {
     const rect = _canvas.getBoundingClientRect();
     const scaleX = _canvas.width / rect.width;
@@ -125,10 +130,10 @@ function InitWindow(width, height, title) {
     _mouse.y = Math.floor((e.clientY - rect.top) * scaleY);
   };
   _canvas.onmousedown = e => {
-    if (_mouseInCanvas) _mouse[e.button] = true;
+    if (_mouse.isInCanvas) _mouse[e.button] = true;
   };
   _canvas.onmouseup = e => {
-    if (_mouseInCanvas) _mouse[e.button] = false;
+    if (_mouse.isInCanvas) _mouse[e.button] = false;
   };
   window.onkeydown = e => {
     if (e.code.length) _keyboard[e.code] = true;
@@ -138,8 +143,8 @@ function InitWindow(width, height, title) {
   };
 
   Object.assign(_canvas.style, {
-    maxWidth: "100vw",
-    maxHeight: "100vh"
+    maxWidth: "100%",
+    maxHeight: "100%"
   });
 
   Object.assign(document.body.style, {
@@ -151,7 +156,7 @@ function InitWindow(width, height, title) {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden"
+    overflow: "auto"
   });
 
   window.onload = () => {
@@ -160,7 +165,7 @@ function InitWindow(width, height, title) {
     _ctx.lineCap = "square";
     document.body.appendChild(_canvas);
     document.title = title;
-    _canvasRect = new Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
+    _canvasRect = Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
     _fpsFontSize = Math.floor((_ctx.canvas.width + _ctx.canvas.height) / 64);
     _ctx.textRendering = "geometricPrecision";
     _ctx.imageSmoothingEnabled = true;
@@ -172,6 +177,10 @@ function InitWindow(width, height, title) {
       console.warn("main() missing");
     }
   };
+}
+
+function SetCursor(cursor) {
+  _ctx.canvas.style.cursor = cursor;
 }
 
 function LoadImage(filename) {
@@ -267,10 +276,72 @@ function CheckCollisionRecs(rect1, rect2) {
   return rect1.x < r2x2 && r1x2 > rect2.x && rect1.y < r2y2 && r1y2 > rect2.y;
 }
 
+function GetCollisionRecs(rect1, rect2) {
+  const collision = { left: false, right: false, top: false, bottom: false };
+  if (rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x) {
+    if (rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y) {
+      if (rect1.x < rect2.x) collision.left = true;
+      if (rect1.x + rect1.width > rect2.x + rect2.width) collision.right = true;
+      if (rect1.y < rect2.y) collision.top = true;
+      if (rect1.y + rect1.height > rect2.y + rect2.height) collision.bottom = true;
+    }
+  }
+  return collision;
+}
+
+function GetCollisionRecBounds(rect, bounds) {
+  const collision = { left: false, right: false, top: false, bottom: false };
+
+  if (rect.x < bounds.x) collision.left = true;
+  if (rect.x + rect.width > bounds.x + bounds.width) collision.right = true;
+  if (rect.y < bounds.y) collision.top = true;
+  if (rect.y + rect.height > bounds.y + bounds.height) collision.bottom = true;
+
+  return collision;
+}
+
+function GetCollisionCircleBounds(circle, bounds) {
+  const collision = { left: false, right: false, top: false, bottom: false };
+
+  if (circle.center.x - circle.radius < bounds.x) collision.left = true;
+  if (circle.center.x + circle.radius > bounds.x + bounds.width) collision.right = true;
+  if (circle.center.y - circle.radius < bounds.y) collision.top = true;
+  if (circle.center.y + circle.radius > bounds.y + bounds.height) collision.bottom = true;
+
+  return collision;
+}
+
 function CheckCollisionCircleRec(circle, rect) {
   const dx = circle.center.x - Math.max(rect.x, Math.min(circle.center.x, rect.x + rect.width));
   const dy = circle.center.y - Math.max(rect.y, Math.min(circle.center.y, rect.y + rect.height));
   return dx * dx + dy * dy <= circle.radius * circle.radius;
+}
+
+function GetCollisionCircleRec(circle, rect) {
+  const collision = { left: false, right: false, top: false, bottom: false };
+
+  const closestX = Math.max(rect.x, Math.min(circle.center.x, rect.x + rect.width));
+  const closestY = Math.max(rect.y, Math.min(circle.center.y, rect.y + rect.height));
+
+  const dx = circle.center.x - closestX;
+  const dy = circle.center.y - closestY;
+
+  if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+    if (circle.center.x < rect.x) collision.left = true;
+    if (circle.center.x > rect.x + rect.width) collision.right = true;
+    if (circle.center.y < rect.y) collision.top = true;
+    if (circle.center.y > rect.y + rect.height) collision.bottom = true;
+  }
+
+  return collision;
+}
+
+function CheckCollisionPointRec(point, rect) {
+  return point.x > rect.x && point.y > rect.y && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
+}
+
+function CheckCollisionPointCircle(point, circle) {
+  return Math.pow(point.x - circle.center.x, 2) + Math.pow(point.y - circle.center.y, 2) < Math.pow(circle.radius, 2);
 }
 
 function _startGameLoop(callback) {
@@ -293,6 +364,7 @@ function _startGameLoop(callback) {
     _lastTime = currentTime;
 
     if (isPageVisible) {
+      // _fps = Math.floor(1 / _frameTime);
       _updateFPS();
       callback();
       _updatePrevMouseState();
@@ -317,8 +389,10 @@ function _updatePrevKeyboardState() {
 }
 
 function ClearBackground(color) {
-  _ctx.fillStyle = color;
-  _ctx.fillRect(0, 0, _ctx.canvas.width, _ctx.canvas.height);
+  if (_ctx.canvas.style.backgroundColor != color) {
+    _ctx.canvas.style.backgroundColor = color;
+  }
+  _ctx.clearRect(0, 0, _ctx.canvas.width, _ctx.canvas.height);
 }
 
 function SetLineThick(thickness) {
@@ -330,7 +404,14 @@ function Clamp(value, min, max) {
 }
 
 function _updateFPS() {
-  _avgFPS = 0.05 / _frameTime + 0.95 * _avgFPS;
+  _fpsSamples = _fpsSamples.filter(fps => fps !== Infinity);
+  let currentFPS = 1 / _frameTime;
+  _fpsSamples.push(currentFPS);
+
+  if (_fpsSamples.length > _maxSamples) {
+    _fpsSamples.shift();
+  }
+  _avgFPS = _fpsSamples.reduce((sum, fps) => sum + fps, 0) / _fpsSamples.length;
   _fps = Math.floor(_avgFPS);
 }
 
@@ -344,7 +425,7 @@ const DrawFPS = (() => {
       lastFPS = GetFPS();
       FPSTimer = 0;
     }
-    DrawText(`${lastFPS} FPS`, x, y, _fpsFontSize, DARKGREEN, { weight: 900 });
+    DrawTextEx(`${lastFPS} FPS`, x, y, _fpsFontSize, DARKGREEN, "left", "top", { weight: "bold" });
   };
 })();
 
@@ -415,10 +496,6 @@ function DrawSquareGrid(x, y, cols, rows, cellSize, color = LIGHTGRAY, thickness
   }
   _ctx.stroke();
   _ctx.restore();
-}
-
-function CheckCollisionPointRec(point, rect) {
-  return point.x > rect.x && point.y > rect.y && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
 }
 
 function DrawLine(x1, y1, x2, y2, color, thickness) {
@@ -513,7 +590,31 @@ function SetFont(newFont) {
   } else _ctx.font = _cachedFont;
 }
 
-function DrawText(text, x, y, size = null, color = null, { align, baseline, weight, style, font } = {}) {
+function DrawText(text, x, y, size = null, color = null) {
+  if (!String(text).length) return;
+  _ctx.save();
+  if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
+  _ctx.textAlign = "left";
+  _ctx.textBaseline = "top";
+  const fontFamily = _ctx.font.split("px")[1];
+  const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
+  SetFont(newFont);
+  _ctx.fillText(text, x, y);
+}
+
+function DrawTextCentered(text, x, y, size = null, color = null) {
+  if (!String(text).length) return;
+  _ctx.save();
+  if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
+  _ctx.textAlign = "center";
+  _ctx.textBaseline = "middle";
+  const fontFamily = _ctx.font.split("px")[1];
+  const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
+  SetFont(newFont);
+  _ctx.fillText(text, x, y);
+}
+
+function DrawTextEx(text, x, y, size, color, align, baseline, { weight, style, font } = {}) {
   if (!String(text).length) return;
   _ctx.save();
   if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
@@ -527,4 +628,64 @@ function DrawText(text, x, y, size = null, color = null, { align, baseline, weig
   }
   _ctx.fillText(text, x, y);
   _ctx.restore();
+}
+
+const _buttonColors = {
+  default: {
+    normal: {
+      inner: "#c9c9c9",
+      outer: "#838383",
+      text: "#686868"
+    },
+    focused: {
+      inner: "#c9effe",
+      outer: "#5bb2d9",
+      text: "#6c9bbc"
+    },
+    pressed: {
+      inner: "#97e8ff",
+      outer: "#0492c7",
+      text: "#368baf"
+    }
+  }
+};
+
+function Button(bounds, text, fontSize = null) {
+  let innerColor;
+  let outerColor;
+  let textColor;
+
+  let clicked = false;
+  let hovering = CheckCollisionPointRec(GetMousePosition(), bounds);
+
+  if (hovering) {
+    innerColor = _buttonColors.default.focused.inner;
+    outerColor = _buttonColors.default.focused.outer;
+    textColor = _buttonColors.default.focused.text;
+
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+      innerColor = _buttonColors.default.pressed.inner;
+      outerColor = _buttonColors.default.pressed.outer;
+      textColor = _buttonColors.default.pressed.text;
+    }
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+      clicked = true;
+    }
+  } else {
+    clicked = false;
+    innerColor = _buttonColors.default.normal.inner;
+    outerColor = _buttonColors.default.normal.outer;
+    textColor = _buttonColors.default.normal.text;
+  }
+
+  const textPos = Vector2(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  DrawRectangleRec(bounds, innerColor);
+  DrawRectangleLinesRec(bounds, outerColor);
+  fontSize = fontSize || Math.min(bounds.height, bounds.width / text.length);
+  DrawText(text, textPos.x, textPos.y, fontSize, textColor, {
+    align: "center",
+    baseline: "middle"
+  });
+
+  return clicked;
 }
