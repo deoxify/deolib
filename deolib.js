@@ -447,14 +447,45 @@ function DrawRectangleLinesRec(rect, color) {
   DrawRectangleLines(rect.x, rect.y, rect.width, rect.height, color);
 }
 
-function DrawRectangleLinesEx(rect, thickness, color) {
+function _DrawRectangleLinesEx(rect, thickness, color) {
   const x = rect.x + thickness;
   const y = rect.y + thickness;
-  _ctx.save();
+  const w = rect.width - thickness * 2;
+  const h = rect.height - thickness * 2;
   _ctx.strokeStyle = color;
+  _ctx.save();
   SetLineThick(thickness);
-  _ctx.strokeRect(x, y, rect.width - thickness * 2, rect.height - thickness * 2);
+  _ctx.strokeRect(x, y, w, h);
   _ctx.restore();
+}
+
+function DrawRectangleLinesEx(rect, thickness, color) {
+  const outerRect = Rectangle(
+    rect.x + thickness / 2,
+    rect.y + thickness / 2,
+    rect.width - thickness,
+    rect.height - thickness
+  );
+  _ctx.beginPath();
+  _ctx.moveTo(outerRect.x, outerRect.y);
+  _ctx.lineTo(outerRect.x + outerRect.width, outerRect.y);
+  _ctx.lineTo(outerRect.x + outerRect.width, outerRect.y + outerRect.height);
+  _ctx.lineTo(outerRect.x, outerRect.y + outerRect.height);
+  _ctx.closePath();
+  _ctx.strokeStyle = color;
+  _ctx.save();
+  SetLineThick(thickness);
+  _ctx.stroke();
+  _ctx.restore();
+  // const x = rect.x + thickness;
+  // const y = rect.y + thickness;
+  // const w = rect.width - thickness * 2;
+  // const h = rect.height - thickness * 2;
+  // _ctx.strokeStyle = color;
+  // _ctx.save();
+  // SetLineThick(thickness);
+  // _ctx.strokeRect(x, y, w, h);
+  // _ctx.restore();
 }
 
 function DrawRectangleRounded(rect, roundness, color) {
@@ -630,27 +661,32 @@ function DrawTextEx(text, x, y, size, color, align, baseline, { weight, style, f
   _ctx.restore();
 }
 
-const _buttonColors = {
+const _buttonStyles = {
   default: {
-    normal: {
-      inner: "#c9c9c9",
-      outer: "#838383",
-      text: "#686868"
-    },
-    focused: {
-      inner: "#c9effe",
-      outer: "#5bb2d9",
-      text: "#6c9bbc"
-    },
-    pressed: {
-      inner: "#97e8ff",
-      outer: "#0492c7",
-      text: "#368baf"
-    }
+    normal: ["#c9c9c9", "#838383", "#686868"],
+    focused: ["#c9effe", "#5bb2d9", "#6c9bbc"],
+    pressed: ["#97e8ff", "#0492c7", "#368baf"],
+    disabled: ["#e6e9e9", "#b5c1c2", "#aeb7b8"]
+  },
+  dark: {
+    normal: ["#2c2c2c", "#878787", "#c3c3c3"],
+    focused: ["#848484", "#e1e1e1", "#181818"],
+    pressed: ["#efefef", "#000000", "#202020"],
+    disabled: ["#818181", "#6a6a6a", "#606060"]
+  },
+  amber: {
+    normal: ["#292929", "#898988", "#d4d4d4"],
+    focused: ["#292929", "#eb891d", "#ffffff"],
+    pressed: ["#f39333", "#f1cf9d", "#282020"],
+    disabled: ["#6a6a6a", "#818181", "#606060"]
   }
 };
 
-function Button(bounds, text, fontSize = null) {
+const BS_DEFAULT = _buttonStyles.default;
+const BS_DARK = _buttonStyles.dark;
+const BS_AMBER = _buttonStyles.amber;
+
+function Button(bounds, text, fontSize = null, style = BS_DEFAULT) {
   let innerColor;
   let outerColor;
   let textColor;
@@ -659,28 +695,29 @@ function Button(bounds, text, fontSize = null) {
   let hovering = CheckCollisionPointRec(GetMousePosition(), bounds);
 
   if (hovering) {
-    innerColor = _buttonColors.default.focused.inner;
-    outerColor = _buttonColors.default.focused.outer;
-    textColor = _buttonColors.default.focused.text;
+    innerColor = style.focused[0];
+    outerColor = style.focused[1];
+    textColor = style.focused[2];
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-      innerColor = _buttonColors.default.pressed.inner;
-      outerColor = _buttonColors.default.pressed.outer;
-      textColor = _buttonColors.default.pressed.text;
+      innerColor = style.pressed[0];
+      outerColor = style.pressed[1];
+      textColor = style.pressed[2];
     }
     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
       clicked = true;
     }
   } else {
     clicked = false;
-    innerColor = _buttonColors.default.normal.inner;
-    outerColor = _buttonColors.default.normal.outer;
-    textColor = _buttonColors.default.normal.text;
+    innerColor = style.normal[0];
+    outerColor = style.normal[1];
+    textColor = style.normal[2];
   }
 
   const textPos = Vector2(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const outerThickness = Math.floor((bounds.width + bounds.height) / 64);
   DrawRectangleRec(bounds, innerColor);
-  DrawRectangleLinesRec(bounds, outerColor);
+  DrawRectangleLinesEx(bounds, outerThickness, outerColor);
   fontSize = fontSize || Math.min(bounds.height, bounds.width / text.length);
   DrawTextCentered(text, textPos.x, textPos.y, fontSize, textColor);
 
