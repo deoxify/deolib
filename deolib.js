@@ -1,40 +1,14 @@
-function Vector2(x = 0, y = 0) {
-  return { x, y };
-}
-
-function Vector2Add(v1, v2) {
-  return Vector2(v1.x + v2.x, v1.y + v2.y);
-}
-
-function Vector2Subtract(v1, v2) {
-  return Vector2(v1.x - v2.x, v1.y - v2.y);
-}
-
-function Vector2Half(v) {
-  return Vector2(v.x / 2, v.y / 2);
-}
-
-function Rectangle(x, y, width, height) {
-  return { x, y, width, height };
-}
-
-function Circle(center, radius) {
-  return { center, radius };
-}
-
 let _ctx;
 let _firstTime = performance.now();
 let _lastTime;
-let _frameTime = 0;
-let _fps = 0;
-let _avgFPS = 0;
+let _frameTime;
+let _fps;
+let _avgFPS;
 let _fpsSamples = [];
-let _maxSamples = 20;
-let _fpsUpdateInterval = 250;
+let _maxFpsSamples = 20;
 let _fpsFontSize;
 let _cachedFont;
 let _canvasRect;
-let _mouseInCanvas;
 let _imageCache = {};
 let _spriteCache = new Map();
 
@@ -92,6 +66,24 @@ const _keyboard = {
   prev: {}
 };
 
+const Vector2 = (x = 0, y = 0) => ({ x, y });
+const Vector2Add = (v1, v2) => Vector2(v1.x + v2.x, v1.y + v2.y);
+const Vector2Subtract = (v1, v2) => Vector2(v1.x - v2.x, v1.y - v2.y);
+const Vector2Multiply = (v, scalar) => Vector2(v.x * scalar, v.y * scalar);
+const Vector2Divide = (v, scalar) => Vector2(v.x / scalar, v.y / scalar);
+const Vector2Magnitude = v => Math.sqrt(v.x * v.x + v.y * v.y);
+const Vector2Normalize = v => {
+  const mag = Vector2Magnitude(v);
+  return mag === 0 ? Vector2() : Vector2Divide(v, mag);
+};
+const Vector2Dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
+const Vector2Cross = (v1, v2) => v1.x * v2.y - v1.y * v2.x;
+const Vector2Distance = (v1, v2) => Vector2Magnitude(Vector2Subtract(v1, v2));
+const Vector2Equals = (v1, v2) => v1.x === v2.x && v1.y === v2.y;
+const Rectangle = (x, y, width, height) => ({ x, y, width, height });
+const Circle = (center, radius) => ({ center, radius });
+
+const IsMouseInCanvas = () => _mouse.isInCanvas;
 const IsMouseButtonDown = buttonId => buttonId in _mouse && _mouse[buttonId];
 const IsMouseButtonUp = buttonId => buttonId in _mouse && !_mouse[buttonId];
 const IsMouseButtonPressed = buttonId => buttonId in _mouse && !_mouse.prev[buttonId] && _mouse[buttonId];
@@ -109,7 +101,7 @@ const GetMouseX = () => _mouse.x;
 const GetMouseY = () => _mouse.y;
 const GetCanvasWidth = () => _ctx.canvas.width;
 const GetCanvasHeight = () => _ctx.canvas.height;
-const GetCanvasRect = () => _canvasRect;
+const GetCanvasRect = () => Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
 const GetFrameTime = () => _frameTime;
 const GetFPS = () => _fps;
 const GetTime = () => (performance.now() - _firstTime) / 1000;
@@ -126,8 +118,8 @@ function InitCanvas(width, height, title) {
     const rect = _canvas.getBoundingClientRect();
     const scaleX = _canvas.width / rect.width;
     const scaleY = _canvas.height / rect.height;
-    _mouse.x = Math.floor((e.clientX - rect.left) * scaleX);
-    _mouse.y = Math.floor((e.clientY - rect.top) * scaleY);
+    _mouse.x = Math.round((e.clientX - rect.left) * scaleX);
+    _mouse.y = Math.round((e.clientY - rect.top) * scaleY);
   };
   _canvas.onmousedown = e => {
     if (_mouse.isInCanvas) _mouse[e.button] = true;
@@ -408,7 +400,7 @@ function _updateFPS() {
   let currentFPS = 1 / _frameTime;
   _fpsSamples.push(currentFPS);
 
-  if (_fpsSamples.length > _maxSamples) {
+  if (_fpsSamples.length > _maxFpsSamples) {
     _fpsSamples.shift();
   }
   _avgFPS = _fpsSamples.reduce((sum, fps) => sum + fps, 0) / _fpsSamples.length;
@@ -419,7 +411,7 @@ const DrawFPS = (() => {
   let FPSTimer = 0;
   let lastFPS = 0;
 
-  return function (x, y, updateInterval = _fpsUpdateInterval) {
+  return function (x, y, updateInterval = 250) {
     FPSTimer += _frameTime * 1000;
     if (FPSTimer >= updateInterval) {
       lastFPS = GetFPS();
@@ -477,15 +469,10 @@ function DrawRectangleLinesEx(rect, thickness, color) {
   SetLineThick(thickness);
   _ctx.stroke();
   _ctx.restore();
-  // const x = rect.x + thickness;
-  // const y = rect.y + thickness;
-  // const w = rect.width - thickness * 2;
-  // const h = rect.height - thickness * 2;
-  // _ctx.strokeStyle = color;
-  // _ctx.save();
-  // SetLineThick(thickness);
-  // _ctx.strokeRect(x, y, w, h);
-  // _ctx.restore();
+}
+
+function DrawRectangleV(pos, size, color) {
+  DrawRectangle(pos.x, pos.y, size.x, size.y, color);
 }
 
 function DrawRectangleRounded(rect, roundness, color) {
@@ -692,9 +679,8 @@ function Button(bounds, text, fontSize = null, style = BS_DEFAULT) {
   let textColor;
 
   let clicked = false;
-  let hovering = CheckCollisionPointRec(GetMousePosition(), bounds);
 
-  if (hovering) {
+  if (CheckCollisionPointRec(GetMousePosition(), bounds)) {
     innerColor = style.focused[0];
     outerColor = style.focused[1];
     textColor = style.focused[2];
