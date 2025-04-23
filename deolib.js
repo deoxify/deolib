@@ -938,7 +938,6 @@ dl.Button = class {
         if (!this.isDisabled) {
             if (MBPressed && mouseOver) {
                 this.pressedInside = true;
-                this.state = this.constructor.State.PRESSED;
             }
             if (MBReleased) {
                 if (this.pressedInside && mouseOver) this._clickedThisFrame = true;
