@@ -1,37 +1,39 @@
+const config = {
+    width: 800,
+    height: 450,
+    title: "Example (Annoying)",
+    autoScale: false,
+};
 // Init
-const canvasWidth = 800;
-const canvasHeight = 450;
-InitCanvas(canvasWidth, canvasHeight, "Basic example");
+dl.initCanvas(config);
 
-const ball = Circle(Vector2(canvasWidth * 0.5, canvasHeight * 0.5), 48);
-const ballVel = Vector2(2, 1);
+const ball = dl.Circle(dl.Vector2(config.width >> 1, config.height >> 1), 48);
+Object.assign(ball, { vel: dl.Vector2(1.5, 1.5) });
 
-let angle = 0;
-let timer = 0;
-let bestTime = 0;
+let angle = 0, timer = 0, bestTime = 0;
 
-// Main game loop
-function main() {
-  ClearBackground(COAL);
+// Main loop
+dl.main = () => {
+    dl.clearBackground(dl.COAL);
 
-  angle += GetRandomFloat(-0.1, 0.1);
-  ball.center.x += Math.sin(angle) * ballVel.x;
-  ball.center.y += Math.cos(angle) * ballVel.y;
+    angle += dl.getRandomFloat(-0.1, 0.1);
+    ball.center.x += Math.sin(angle) * ball.vel.x;
+    ball.center.y += Math.cos(angle) * ball.vel.y;
 
-  const edgeCollision = GetCollisionCircleBounds(ball, GetCanvasRect());
-  if (edgeCollision.left || edgeCollision.right) ballVel.x = -ballVel.x;
-  if (edgeCollision.top || edgeCollision.bottom) ballVel.y = -ballVel.y;
+    const edgeCollision = dl.getCollisionCircleBounds(ball, dl.getCanvasRect());
+    if (edgeCollision.left || edgeCollision.right) ball.vel.x = -ball.vel.x;
+    if (edgeCollision.top || edgeCollision.bottom) ball.vel.y = -ball.vel.y;
 
-  if (CheckCollisionPointCircle(GetMousePosition(), ball)) {
-    timer = Math.min(timer + GetFrameTime(), 99.99);
-    const fontSize = Math.min(timer * 30, canvasWidth * 0.2);
-    DrawTextCentered(`${timer.toFixed(2)}s`, canvasWidth * 0.5, canvasHeight * 0.5, fontSize, DARKGRAY);
-    DrawCircleLinesV(ball.center, ball.radius, GREEN);
-  } else {
-    if (timer > bestTime) bestTime = timer;
-    timer = 0;
-    DrawCircleLinesV(ball.center, ball.radius, RED);
-  }
-  DrawText(`Best: ${bestTime.toFixed(2)}s`, 15, canvasHeight - 30, 20, DARKGREEN);
-  DrawFPS(15, 15);
+    if (dl.checkCollisionPointCircle(dl.getMousePosition(), ball)) {
+        timer = Math.min(timer + dl.getFrameTime(), 99.99);
+        const fontSize = Math.min(timer * 30, config.width * 0.2);
+        dl.drawTextCentered(`${timer.toFixed(2)}s`, config.width * 0.5, config.height * 0.5, fontSize, dl.DARKGRAY);
+        dl.drawCircleLinesV(ball.center, ball.radius, dl.GREEN);
+    } else {
+        if (timer > bestTime) bestTime = timer;
+        timer = 0;
+        dl.drawCircleLinesV(ball.center, ball.radius, dl.RED);
+    }
+    dl.drawText(`Best: ${bestTime.toFixed(2)}s`, 15, config.height - 30, 20, dl.GREEN);
+    dl.drawFPS(15, 15);
 }
