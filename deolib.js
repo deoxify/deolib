@@ -1,16 +1,20 @@
 let _ctx;
-let _firstTime = performance.now();
+let _firstTime;
 let _lastTime;
 let _frameTime;
 let _fps;
 let _avgFPS;
-let _fpsSamples = [];
-let _maxFpsSamples = 20;
 let _fpsFontSize;
 let _cachedFont;
-let _canvasRect;
-let _imageCache = {};
-let _spriteCache = new Map();
+let _fpsSamples = [];
+let _masterGain = null;
+
+const _imageCache = {};
+const _spriteCache = new Map();
+const _guiButtons = new Map();
+
+const _audioCache = new Map();
+const _audioCtx = new AudioContext();
 
 const dl = {};
 
@@ -44,29 +48,32 @@ dl.BROWN = "#7f6a4f";
 dl.DARKBROWN = "#4c3f2f";
 dl.WHITE = "#ffffff";
 dl.BLACK = "#000000";
-dl.BLANK = "transparent";
 dl.MAGENTA = "#ff00ff";
+dl.BLANK = "transparent";
 
-dl.CUR_DEFAULT = "default";
-dl.CUR_CROSSHAIR = "crosshair";
-dl.CUR_POINTER = "pointer";
-dl.CUR_HIDDEN = "none";
+dl.CURSOR_DEFAULT = "default";
+dl.CURSOR_CROSSHAIR = "crosshair";
+dl.CURSOR_POINTER = "pointer";
+dl.CURSOR_HIDDEN = "none";
 
-dl.MOUSE_LEFT_BUTTON = 0;
-dl.MOUSE_MIDDLE_BUTTON = 1;
-dl.MOUSE_RIGHT_BUTTON = 2;
+dl.LEFT_MOUSE_BUTTON = 0;
+dl.MIDDLE_MOUSE_BUTTON = 1;
+dl.RIGHT_MOUSE_BUTTON = 2;
 
 const _mouse = {
     x: -1,
     y: -1,
+    prevX: -1,
+    prevY: -1,
+    wheel: 0,
     isInCanvas: false,
-    [dl.MOUSE_LEFT_BUTTON]: false,
-    [dl.MOUSE_MIDDLE_BUTTON]: false,
-    [dl.MOUSE_RIGHT_BUTTON]: false,
+    [dl.LEFT_MOUSE_BUTTON]: false,
+    [dl.MIDDLE_MOUSE_BUTTON]: false,
+    [dl.RIGHT_MOUSE_BUTTON]: false,
     prev: {
-        [dl.MOUSE_LEFT_BUTTON]: false,
-        [dl.MOUSE_MIDDLE_BUTTON]: false,
-        [dl.MOUSE_RIGHT_BUTTON]: false
+        [dl.LEFT_MOUSE_BUTTON]: false,
+        [dl.MIDDLE_MOUSE_BUTTON]: false,
+        [dl.RIGHT_MOUSE_BUTTON]: false
     }
 };
 
@@ -76,6 +83,7 @@ const _keyboard = {
 
 dl.Vector2 = (x = 0, y = 0) => ({ x, y });
 dl.Vector2Zero = () => dl.Vector2();
+dl.Vector2FromArray = (arr) => dl.Vector2(arr[0], arr[1]);
 dl.Vector2Add = (v1, v2) => dl.Vector2(v1.x + v2.x, v1.y + v2.y);
 dl.Vector2Subtract = (v1, v2) => dl.Vector2(v1.x - v2.x, v1.y - v2.y);
 dl.Vector2Multiply = (v1, v2) => dl.Vector2(v1.x * v2.x, v1.y * v2.y);
@@ -90,6 +98,7 @@ dl.Vector2DivideScalar = (v, scalar) => {
 dl.Vector2Scale = (v, scalar) => dl.Vector2(v.x * scalar, v.y * scalar);
 dl.Vector2Magnitude = v => Math.sqrt((v.x * v.x) + (v.y * v.y));
 dl.Vector2Length = dl.Vector2Magnitude;
+dl.Vector2Lerp = (v1, v2, t) => dl.Vector2(dl.lerp(v1.x, v2.x, t), dl.lerp(v1.y, v2.y, t));
 dl.Vector2Normalize = v => {
     const mag = dl.Vector2Magnitude(v);
     return mag === 0 ? dl.Vector2() : dl.Vector2DivideScalar(v, mag);
@@ -111,17 +120,34 @@ dl.Vector2MoveTowards = (v, target, maxDistance) => {
     const factor = maxDistance / dist;
     return dl.Vector2(v.x + dx * factor, v.y + dy * factor);
 };
+dl.Vector2Rotate = (v, angle) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return dl.Vector2(
+        v.x * cos - v.y * sin,
+        v.x * sin + v.y * cos
+    );
+};
+dl.Vector2Angle = (v1, v2) => v2 === undefined ? Math.atan2(v1.y, v1.x) : Math.atan2(v2.y - v1.y, v2.x - v1.x);
+dl.Vector2Reflect = (v, normal) => {
+    const dot = dl.Vector2Dot(v, normal);
+    return dl.Vector2(
+        v.x - 2 * dot * normal.x,
+        v.y - 2 * dot * normal.y
+    );
+};
 
 dl.Rectangle = (x, y, width, height) => ({ x, y, width, height });
 dl.Circle = (center, radius) => ({ center, radius });
 
 dl.clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+dl.lerp = (a, b, t) => a + (b - a) * t;
 
 dl.isMouseInCanvas = () => _mouse.isInCanvas;
-dl.isMouseButtonDown = (buttonId = dl.MOUSE_LEFT_BUTTON) => buttonId in _mouse && _mouse[buttonId];
-dl.isMouseButtonUp = (buttonId = dl.MOUSE_LEFT_BUTTON) => buttonId in _mouse && !_mouse[buttonId];
-dl.isMouseButtonPressed = (buttonId = dl.MOUSE_LEFT_BUTTON) => buttonId in _mouse && !_mouse.prev[buttonId] && _mouse[buttonId];
-dl.isMouseButtonReleased = (buttonId = dl.MOUSE_LEFT_BUTTON) => buttonId in _mouse && _mouse.prev[buttonId] && !_mouse[buttonId];
+dl.isMouseButtonDown = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && _mouse[buttonId];
+dl.isMouseButtonUp = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && !_mouse[buttonId];
+dl.isMouseButtonPressed = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && !_mouse.prev[buttonId] && _mouse[buttonId];
+dl.isMouseButtonReleased = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && _mouse.prev[buttonId] && !_mouse[buttonId];
 dl.isKeyDown = keyCode => keyCode in _keyboard && _keyboard[keyCode];
 dl.isKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
 dl.isKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
@@ -130,27 +156,29 @@ dl.getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + mi
 dl.getRandomFloat = (min, max) => Math.random() * (max - min) + min;
 dl.getRandomElem = arr => arr[dl.getRandomInt(0, arr.length - 1)];
 dl.getRandomColor = () => `#${(c => c < 0x202020 ? dl.getRandomColor().slice(1) : c.toString(16).padStart(6, '0'))((Math.random() * 0xffffff) << 0)}`;
-dl.getMousePosition = () => dl.Vector2(Math.round(_mouse.x), Math.round(_mouse.y));
+dl.getMousePosition = () => dl.Vector2(Math.round(_mouse.currentFrameX), Math.round(_mouse.currentFrameY));
+dl.getMouseDelta = () => dl.Vector2(_mouse.currentFrameX - _mouse.prevX, _mouse.currentFrameY - _mouse.prevY);
+dl.getMouseWheelMove = () => {
+    const move = _mouse.wheel;
+    _mouse.wheel = 0;
+    return move;
+};
 dl.getMouseX = () => _mouse.x;
 dl.getMouseY = () => _mouse.y;
 dl.getCanvasWidth = () => _ctx.canvas.width;
 dl.getCanvasHeight = () => _ctx.canvas.height;
 dl.getCanvasRect = () => dl.Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
+dl.getCanvasCenter = () => dl.Vector2(_ctx.canvas.width>>1, _ctx.canvas.height>>1);
 dl.getFrameTime = () => _frameTime;
 dl.getFPS = () => _fps;
 dl.getTime = () => (performance.now() - _firstTime) / 1000;
 
-dl.hideCursor = () => {
-    _ctx.canvas.style.cursor = dl.CUR_HIDDEN;
-}
+dl.hideCursor = () => _ctx.canvas.style.cursor = dl.CURSOR_HIDDEN;
+dl.showCursor = () => _ctx.canvas.style.cursor = dl.CURSOR_DEFAULT;
 
-dl.showCursor = () => {
-    _ctx.canvas.style.cursor = dl.CUR_DEFAULT;
-}
-
-dl.initCanvas = ({ width, height, title,
-    noContextMenu = false, autoScale = false, pageBgColor = "#282828", antiAliasing = true
-}) => {
+dl.initCanvas = ({ width, height, title = "untitled",
+    showContextMenu = false, autoExpand = false, pageBgColor = "#282828", antiAliasing = true,
+    borderColor = "transparent" }) => {
     const canvas = document.createElement("canvas");
     _ctx = canvas.getContext("2d");
     canvas.width = width;
@@ -165,8 +193,8 @@ dl.initCanvas = ({ width, height, title,
             canvas.style.height = `${Math.round(innerWidth / ar)}px`;
         }
     }
-    canvas.oncontextmenu = e => { if (noContextMenu) e.preventDefault() };
-    window.onresize = autoScale ? onresize : window.onresize;
+    canvas.oncontextmenu = e => { if (!showContextMenu) e.preventDefault(); }
+    window.onresize = autoExpand ? onresize : window.onresize;
     canvas.onpointerenter = () => (_mouse.isInCanvas = true);
     canvas.onpointerleave = () => ((_mouse.isInCanvas = false));
     canvas.onpointermove = e => {
@@ -178,6 +206,7 @@ dl.initCanvas = ({ width, height, title,
     };
     canvas.onpointerdown = e => {
         if (_mouse.isInCanvas) _mouse[e.button] = true;
+        if (_audioCtx.state === 'suspended') _audioCtx.resume();
     };
     canvas.onpointerup = e => {
         if (_mouse.isInCanvas) _mouse[e.button] = false;
@@ -188,24 +217,48 @@ dl.initCanvas = ({ width, height, title,
     window.onkeyup = e => {
         if (e.code in _keyboard) _keyboard[e.code] = false;
     };
+    canvas.onwheel = e => {
+        e.preventDefault();
+        _mouse.wheel = e.deltaY > 0 ? -1 : 1;
+    };
 
     Object.assign(canvas.style, {
-        maxWidth: "100vw",
-        maxHeight: "100vh",
+        maxWidth: "100%",
+        maxHeight: "100%",
         imageRendering: antiAliasing ? "smooth" : "pixelated",
+        border: borderColor ? `1px solid ${borderColor}` : "none",
     });
 
     Object.assign(document.body.style, {
         backgroundColor: pageBgColor,
         width: "100vw",
         height: "100vh",
-        margin: "0",
-        padding: "0",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        overflow: "auto"
+        overflow: "hidden",
     });
+
+    const styleSheet = document.styleSheets[0];
+    styleSheet && styleSheet.insertRule(`
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
+    `, styleSheet.cssRules.length);
+
+    const link = document.createElement('link');
+    link.rel = "icon";
+    link.type = "image/png";
+    link.href = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAA";
+    link.href += "f8/9hAAAAsUlEQVR4AaTNgQnDQAxD0bYjZP8Zs0LLM+hwTDgCDXzOlmTl8/r";
+    link.href += "zuxSc5/l9Qv/nKnDIOI7jvUMmWXMVRHBo3iHjUMZbBUQQvWB2aJiZKiBCIEe";
+    link.href += "7WRayVSAMIhigwQweaKBVgQERhe6QmVwKmEruiOftrIL8sZuZeUr7nrkKEhA";
+    link.href += "yx/Ta6Zm92c1VYAjd7Md3Pm0VCBOCvZdFn28VJOgoRJsHc68CooMObcKf2iq";
+    link.href += "YxtP9BwAA///OEEeOAAAABklEQVQDABh30CG/IL+KAAAAAElFTkSuQmCC";
+
+    document.head.appendChild(link);
 
     window.onload = () => {
         _ctx.textAlign = "left";
@@ -213,7 +266,6 @@ dl.initCanvas = ({ width, height, title,
         _ctx.lineCap = "square";
         document.body.appendChild(canvas);
         document.title = title;
-        _canvasRect = dl.Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
         const w = _ctx.canvas.width;
         const h = _ctx.canvas.height;
         _fpsFontSize = Math.floor(Math.sqrt(w * w + h * h) / 50);
@@ -221,35 +273,90 @@ dl.initCanvas = ({ width, height, title,
         _ctx.imageSmoothingEnabled = antiAliasing;
         _ctx.lineWidth = 2;
         dl.setFont("20px monospace, system, sans-serif");
-        if (autoScale) onresize();
-        if (dl.main && typeof dl.main === "function") {
+        if (autoExpand) onresize();
+        if (dl.main && typeof dl.main == "function") {
             _startGameLoop(dl.main);
         } else {
             console.warn("missing dl.main()");
         }
     };
+
+    _firstTime = performance.now();
+
+    return {
+        width,
+        height,
+        title,
+        aspectRatio: ar,
+        autoExpand,
+        pageBgColor,
+        antiAliasing,
+        borderColor,
+        showContextMenu
+    };
+}
+
+dl.setTitle = (newTitle) => {
+    if (newTitle == undefined || newTitle == null) return;
+    document.title = String(newTitle);
 }
 
 dl.setCursor = (cursor) => {
     _ctx.canvas.style.cursor = cursor;
 }
 
+dl.getRandomString = (length) => {
+    let str = "";
+    for (let i=0; i<length; ++i) {
+        let charCode;
+        if (Math.random() < 0.5) charCode = dl.getRandomInt(65,90);
+        else charCode = dl.getRandomInt(97,122);
+        str += String.fromCharCode(charCode)
+    }
+    return str;
+}
+
 dl.loadImage = (filename) => {
+
     if (_imageCache[filename]) return _imageCache[filename];
 
     const placeholder = new Image();
     placeholder.src = "";
 
     const img = new Image();
+    img.src = filename;
+
     img.onload = () => {
         _imageCache[filename] = img;
         Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
     };
     img.onerror = err => console.error(`Failed to load image: ${filename}`, err);
-    img.src = filename;
 
     _imageCache[filename] = placeholder;
     return placeholder;
+}
+
+dl.Image = class {
+    constructor(source) {
+
+        const placeholder = new Image();
+        placeholder.src = "";
+
+        const img = new Image();
+        img.src = source;
+
+        img.onload = () => 
+            Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
+
+        img.onerror = err => 
+            console.error(`Failed to load image: ${source}`, err);
+
+        this.img = placeholder;
+    }
+
+    draw(x, y) {
+        _ctx.drawImage(this.img, x, y);
+    }
 }
 
 dl.loadSpreadSheet = (filename, spriteWidth, spriteHeight) => {
@@ -314,6 +421,23 @@ dl.drawImageRec = (img, rect) => {
     _ctx.drawImage(img, rect.x, rect.y, rect.width, rect.height);
 }
 
+dl.drawImagePro = (img, source, dest, origin, rotation, tint = 1.0) => {
+    _ctx.save();
+
+    _ctx.translate(dest.x, dest.y);
+    _ctx.rotate(rotation * dl.DEG2RAD);
+    _ctx.translate(-origin.x, -origin.y);
+    _ctx.globalAlpha = tint;
+
+    _ctx.drawImage(
+        img,
+        source.x, source.y, source.width, source.height,
+        0, 0, dest.width, dest.height
+    );
+    
+    _ctx.restore();
+};
+
 dl.toggleFullscreen = () => {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen();
     else document.exitFullscreen();
@@ -365,10 +489,10 @@ dl.getCollisionCircleBounds = (circle, bounds) => {
 dl.checkCollisionCircles = (center1, radius1, center2, radius2) => {
     const dx = center2.x - center1.x;
     const dy = center2.y - center1.y;
-    const distanceSQ = dx * dx + dy * dy;
+    const distanceSq = dx * dx + dy * dy;
     const radiusSum = radius1 + radius2;
 
-    return distanceSQ <= (radiusSum * radiusSum);
+    return distanceSq <= (radiusSum * radiusSum);
 };
 
 dl.checkCollisionCircleLine = (center, radius, p1, p2) => {
@@ -444,16 +568,20 @@ function _startGameLoop(callback) {
         _frameTime = (currentTime - _lastTime) / 1000;
         _lastTime = currentTime;
 
-        if (isPageVisible) {
-            try {
-                _updateFPS();
-                callback();
-                _updatePrevMouseState();
-                _updatePrevKeyboardState();
-                frameRef = requestAnimationFrame(loop);
-            } catch (e) {
-                console.error(e);
-            }
+        try {
+            _mouse.currentFrameX = _mouse.x;
+            _mouse.currentFrameY = _mouse.y;
+            _updateFPS();
+            callback();
+
+            _updatePrevMouseState();
+            _updatePrevKeyboardState();
+            _mouse.prevX = _mouse.currentFrameX;
+            _mouse.prevY = _mouse.currentFrameY;
+            
+            frameRef = requestAnimationFrame(loop);
+        } catch (e) {
+            console.error(e);
         }
     }
     document.onvisibilitychange = handleVisibilityChange;
@@ -461,9 +589,9 @@ function _startGameLoop(callback) {
 }
 
 function _updatePrevMouseState() {
-    _mouse.prev[dl.MOUSE_LEFT_BUTTON] = _mouse[dl.MOUSE_LEFT_BUTTON];
-    _mouse.prev[dl.MOUSE_MIDDLE_BUTTON] = _mouse[dl.MOUSE_MIDDLE_BUTTON];
-    _mouse.prev[dl.MOUSE_RIGHT_BUTTON] = _mouse[dl.MOUSE_RIGHT_BUTTON];
+    _mouse.prev[dl.LEFT_MOUSE_BUTTON] = _mouse[dl.LEFT_MOUSE_BUTTON];
+    _mouse.prev[dl.MIDDLE_MOUSE_BUTTON] = _mouse[dl.MIDDLE_MOUSE_BUTTON];
+    _mouse.prev[dl.RIGHT_MOUSE_BUTTON] = _mouse[dl.RIGHT_MOUSE_BUTTON];
 }
 
 function _updatePrevKeyboardState() {
@@ -521,7 +649,7 @@ function _updateFPS() {
     let currentFPS = 1 / _frameTime;
     _fpsSamples.push(currentFPS);
 
-    if (_fpsSamples.length > _maxFpsSamples) {
+    if (_fpsSamples.length > 20) {
         _fpsSamples.shift();
     }
     _avgFPS = _fpsSamples.reduce((sum, fps) => sum + fps, 0) / _fpsSamples.length;
@@ -532,13 +660,13 @@ dl.drawFPS = (() => {
     let FPSTimer = 0;
     let lastFPS = 0;
 
-    return function (x, y, updateInterval = 250) {
+    return function (x, y, updateInterval = 250, fontSize = null) {
         FPSTimer += _frameTime * 1000;
         if (FPSTimer >= updateInterval) {
             lastFPS = dl.getFPS();
             FPSTimer = 0;
         }
-        dl.drawTextEx(`${lastFPS} FPS`, x, y, _fpsFontSize, dl.DARKGREEN, "left", "top", { weight: "bold" });
+        dl.drawTextEx(`${lastFPS} FPS`, x, y, fontSize || _fpsFontSize, dl.LIME, "left", "top", { weight: "bold" });
     };
 })();
 
@@ -648,6 +776,62 @@ dl.drawLine = (x1, y1, x2, y2, color, lineThick) => {
     _ctx.closePath();
 }
 
+dl.drawLineStrip = (points, color) => {
+    if (!Array.isArray(points) || points.length < 2) {
+        console.warn("dl.drawLineStrip: Needs at least 2 points.");
+        return;
+    }
+    _ctx.save();
+    _ctx.strokeStyle = color;
+    _ctx.beginPath();
+    _ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        _ctx.lineTo(points[i].x, points[i].y);
+    }
+    _ctx.stroke();
+    _ctx.restore();
+};
+
+function _easeCubicInOut(t, b, c, d) {
+    t /= d / 2;
+    if (t < 1) return c / 2 * t * t * t + b;
+    t -= 2;
+    return c / 2 * (t * t * t + 2) + b;
+};
+
+dl.drawLineBezier = (startPos, endPos, thick, color, curvatureFactor = 0.5) => {
+    _ctx.save();
+    _ctx.strokeStyle = color;
+    _ctx.lineWidth = thick;
+    _ctx.lineCap = "round";
+
+    _ctx.beginPath();
+    _ctx.moveTo(startPos.x, startPos.y);
+
+    const midX = (startPos.x + endPos.x) / 2;
+    const midY = (startPos.y + endPos.y) / 2;
+
+    const dx = endPos.x - startPos.x;
+    const dy = endPos.y - startPos.y;
+
+    const length = Math.sqrt(dx * dx + dy * dy);
+    let normalPerpDx = 0;
+    let normalPerpDy = 0;
+    if (length > dl.FLT_EPSILON) {
+        normalPerpDx = -dy / length;
+        normalPerpDy = dx / length;
+    }
+
+    const offsetAmount = length * curvatureFactor;
+    const controlPointX = midX + normalPerpDx * offsetAmount;
+    const controlPointY = midY + normalPerpDy * offsetAmount;
+
+    _ctx.quadraticCurveTo(controlPointX, controlPointY, endPos.x, endPos.y);
+
+    _ctx.stroke();
+    _ctx.restore();
+};
+
 dl.drawCircle = (centerX, centerY, radius, color) => {
     _ctx.beginPath();
     _ctx.fillStyle = color;
@@ -670,10 +854,10 @@ dl.drawCircleLinesV = (center, radius, color) => {
     dl.drawCircleLines(center.x, center.y, radius, color);
 }
 
-dl.drawCircleLinesEx = (circle, thickness, color) => {
+dl.drawCircleLinesEx = (center, radius, thickness, color) => {
     _ctx.save();
     _ctx.lineWidth = thickness;
-    dl.drawCircleLines(circle.center.x, circle.center.y, circle.radius, color);
+    dl.drawCircleLinesV(center.x, center.y, radius, color);
     _ctx.restore();
 }
 
@@ -804,55 +988,87 @@ dl.drawTextEx = (text, x, y, size, color, align, baseline, { weight, style, font
     _ctx.restore();
 }
 
-dl.drawTextAlongArc = (str, centerX, centerY, radius, angle) => {
+dl.drawTextAlongArc = (str, centerX, centerY, radius, angle, size = null, color = null) => {
     const len = str.length;
-    let s;
+    if (len === 0) return;
+
     _ctx.save();
+    if (color) _ctx.fillStyle = color;
+    if (size) {
+        const fontFamily = _ctx.font.split("px")[1];
+        dl.setFont(`${size}px ${fontFamily}`);
+    }
+
+    _ctx.textAlign = "center";
+    _ctx.textBaseline = "middle";
     _ctx.translate(centerX, centerY);
-    _ctx.rotate((-1 * angle) / 2);
-    _ctx.rotate((-1 * (angle / len)) / 2);
-    for (var n = 0; n < len; n++) {
-        _ctx.rotate(angle / len);
+    _ctx.rotate((-angle) / 2);
+
+    const step = angle / len;
+    _ctx.rotate(step / 2);
+
+    for (let n = 0; n < len; ++n) {
         _ctx.save();
-        _ctx.translate(0, -1 * radius);
-        s = str[n];
-        _ctx.fillText(s, 0, 0);
+        _ctx.translate(0, -radius); 
+        _ctx.fillText(str[n], 0, 0);
         _ctx.restore();
+        _ctx.rotate(step);
     }
     _ctx.restore();
-}
+};
 
 const _buttonStyles = {
     default: {
         normal: ["#c9c9c9", "#838383", "#686868"],
         focused: ["#c9effe", "#5bb2d9", "#6c9bbc"],
         pressed: ["#97e8ff", "#0492c7", "#368baf"],
-        disabled: ["#e6e9e9", "#b5c1c2", "#aeb7b8"]
+        disabled: ["#e6e9e9", "#b5c1c2", "#aeb7b8"],
     },
     dark: {
         normal: ["#2c2c2c", "#878787", "#c3c3c3"],
         focused: ["#848484", "#e1e1e1", "#181818"],
         pressed: ["#efefef", "#000000", "#202020"],
-        disabled: ["#818181", "#6a6a6a", "#606060"]
+        disabled: ["#818181", "#6a6a6a", "#606060"],
     },
     amber: {
         normal: ["#292929", "#898988", "#d4d4d4"],
         focused: ["#292929", "#eb891d", "#ffffff"],
         pressed: ["#f39333", "#f1cf9d", "#282020"],
-        disabled: ["#6a6a6a", "#818181", "#606060"]
+        disabled: ["#6a6a6a", "#818181", "#606060"],
     },
+    genesis: {
+        normal:  ["#181b1eff", "#667384ff", "#c2c8d0ff"],
+        focused: ["#a7afb0ff", "#d3dbdfff", "#020202ff"],
+        pressed: ["#ac3c3cff", "#181b1eff", "#dededeff"],
+        disabled:["#2e353dff", "#3e4550ff", "#484f57ff"],
+    },
+    rltech: {
+        normal:  ["#ffffff", "#000000", "#000000"],
+        focused: ["#ffffff", "#ff0000", "#ff0000"],
+        pressed: ["#1a1a1a", "#000000", "#ff0000"],
+        disabled:["#e0e0e0", "#c0c0c0", "#b0b0b0"],
+    },
+    terminal: {
+        normal:   ["#38f620", "#1c8d00", "#161313"],
+        focused:  ["#dcfadc", "#c3fbc6", "#43bf2e"],
+        pressed:  ["#1e6f15", "#1f5b19", "#43ff28"],
+        disabled: ["#244125", "#223b22", "#182c18"],
+    }
 };
 
-dl.BS_DEFAULT = _buttonStyles.default;
-dl.BS_DARK = _buttonStyles.dark;
-dl.BS_AMBER = _buttonStyles.amber;
+dl.BS_DEFAULT  = _buttonStyles.default;
+dl.BS_DARK     = _buttonStyles.dark;
+dl.BS_AMBER    = _buttonStyles.amber;
+dl.BS_GENESIS  = _buttonStyles.genesis;
+dl.BS_RLTECH   = _buttonStyles.rltech;
+dl.BS_TERMINAL = _buttonStyles.terminal;
 
 dl.Button = class {
     static State = {
         NORMAL: "normal",
         FOCUSED: "focused",
         PRESSED: "pressed",
-        DISABLED: "disabled"
+        DISABLED: "disabled",
     };
 
     static IDCounter = 0;
@@ -884,14 +1100,14 @@ dl.Button = class {
         this.cachedFont = null;
         this.state = "normal";
 
-        this.updateText();
+        this.setText();
     }
 
-    updateText(newText = this.text) {
+    setText(newText = this.text) {
         this.text = String(newText);
 
         this.textLines = this.text.split("\n");
-        this.cachedFont = `${this.fontSize || 20}px monospace, system, sans-serif`;
+        this.cachedFont = `bold ${this.fontSize || 20}px monospace, system, sans-serif`;
 
         _ctx.save();
         _ctx.font = this.cachedFont;
@@ -938,6 +1154,7 @@ dl.Button = class {
         if (!this.isDisabled) {
             if (MBPressed && mouseOver) {
                 this.pressedInside = true;
+                this.state = this.constructor.State.PRESSED;
             }
             if (MBReleased) {
                 if (this.pressedInside && mouseOver) this._clickedThisFrame = true;
@@ -959,9 +1176,11 @@ dl.Button = class {
     setInnerColor(color) { 
         this._innerColor = color || null;
     }
+
     setBorderColor(color) {
         this._borderColor = color || null;
     }
+    
     setTextColor(color) {
         this._textColor = color || null;
     }
@@ -971,7 +1190,7 @@ dl.Button = class {
         const borderColor = this._borderColor || this.style[this.state][1];
         const textColor = this._textColor || this.style[this.state][2];
 
-        if (this.roundness) {
+        if (this.roundness > 0) {
             dl.drawRectangleRoundedRec(this.bounds, this.roundness, borderColor);
             dl.drawRectangleRoundedRec(this.innerRect, this.roundness, innerColor);
         } else {
@@ -992,8 +1211,6 @@ dl.Button = class {
     }
 };
 
-_guiButtons = new Map();
-
 dl.guiButton = (id, bounds, text, options = {}) => {
     let btn = _guiButtons.get(id);
     if (!btn) {
@@ -1002,6 +1219,133 @@ dl.guiButton = (id, bounds, text, options = {}) => {
     }
     btn.update();
     btn.draw();
-    const pressed = btn.isPressed();
-    return pressed;
+    return btn.isPressed();
+};
+
+dl.guiLabelButton = (id, x, y, text, options = {}) => {
+    const fontSize = options.fontSize || 20;
+    if (!options.style) {
+        options.style = dl.BS_GENESIS;
+    }
+
+    _ctx.save();
+    _ctx.font = `${fontSize}px monospace, system, sans-serif`;
+    const lines = String(text).split("\n");
+
+    const lineMetrics = lines.map(line => {
+        const m = _ctx.measureText(line);
+        const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
+        const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
+        return { width: m.width, height: ascent + descent };
+    });
+
+    const widest = Math.max(...lineMetrics.map(m => m.width));
+    const totalHeight = lineMetrics.reduce((a, b) => a + b.height, 0);
+    _ctx.restore();
+
+    const bounds = dl.Rectangle(x, y, widest, totalHeight);
+
+    let btn = _guiButtons.get(id);
+    if (!btn) {
+        btn = new dl.Button(bounds, text, { ...options, id, roundness: 0, borderThick: 0 });
+        _guiButtons.set(id, btn);
+    } else {
+        if (btn.text !== text) btn.setText(text);
+        btn.bounds = bounds;
+        btn.innerRect = dl.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+    }
+
+    btn.update();
+
+    const textColor = btn._textColor || btn.style[btn.state][2];
+    _ctx.save();
+    _ctx.fillStyle = textColor;
+    _ctx.textAlign = "left";
+    _ctx.textBaseline = "alphabetic";
+    _ctx.font = `${fontSize}px monospace, system, sans-serif`;
+
+    let yPos = y + lineMetrics[0].height - (lineMetrics[0].height * 0.2);
+    for (let i = 0; i < lines.length; ++i) {
+        _ctx.fillText(lines[i], x, yPos);
+        if (i < lines.length - 1) yPos += lineMetrics[i + 1].height;
+    }
+    _ctx.restore();
+
+    return btn.isPressed();
+};
+
+dl.openURL = (url) => {
+    try {
+        window.open(url, "_blank");
+    } catch (e) {
+        console.error(`dl: Failed to open URL: ${url}`, e);
+    }
+};
+
+dl.saveFileText = (fileName, text) => {
+    try {
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+
+        document.body.appendChild(a);
+        a.click();
+
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        return true;
+    } catch (e) {
+        console.error(`dl: Failed to initiate file save for: ${fileName}`, e);
+        return false;
+    }
+};
+
+const _loadSound = async (path) => {
+    if (_audioCache.has(path)) return _audioCache.get(path);
+
+    try {
+        const response = await fetch(path);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await _audioCtx.decodeAudioData(arrayBuffer);
+        
+        _audioCache.set(path, audioBuffer);
+        return audioBuffer;
+    } catch (e) {
+        console.error(`Failed to load sound: ${path}`, e);
+        return null;
+    }
+};
+
+dl.playSound = (path, volume = 1.0, pitch = 1.0) => {
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+
+    if (!_masterGain) {
+        _masterGain = _audioCtx.createGain();
+        _masterGain.connect(_audioCtx.destination);
+        _masterGain.gain.value = 0.7; 
+    }
+
+    const buffer = _audioCache.get(path);
+    
+    if (!buffer) {
+        _loadSound(path).then(newBuffer => {
+            if (newBuffer) dl.playSound(path, volume, pitch);
+        });
+        return;
+    }
+
+    const source = _audioCtx.createBufferSource();
+    const gainNode = _audioCtx.createGain();
+
+    source.buffer = buffer;
+    source.playbackRate.value = pitch;
+    gainNode.gain.value = volume;
+
+    source.connect(gainNode);
+    gainNode.connect(_masterGain);
+    source.start(0);
 };
