@@ -1,18 +1,17 @@
-const config = {
+const config = dl.initCanvas({
     width: 800,
     height: 450,
-    title: "Example (Annoying)",
-    autoScale: false,
-};
-// Init
-dl.initCanvas(config);
+    title: "Example",
+});
 
-const ball = dl.Circle(dl.Vector2(config.width >> 1, config.height >> 1), 48);
-Object.assign(ball, { vel: dl.Vector2(1.5, 1.5) });
+const ball = {
+    center: dl.Vector2(config.width >> 1, config.height >> 1),
+    radius: 48,
+    vel: dl.Vector2(1.5, 1.5)
+};
 
 let angle = 0, timer = 0, bestTime = 0;
 
-// Main loop
 dl.main = () => {
     dl.clearBackground(dl.COAL);
 
@@ -35,5 +34,4 @@ dl.main = () => {
         dl.drawCircleLinesV(ball.center, ball.radius, dl.RED);
     }
     dl.drawText(`Best: ${bestTime.toFixed(2)}s`, 15, config.height - 30, 20, dl.GREEN);
-    dl.drawFPS(15, 15);
 }
