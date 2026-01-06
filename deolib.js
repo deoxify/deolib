@@ -347,16 +347,44 @@ dl.setCursor = (cursor) => {
     _ctx.canvas.style.cursor = cursor;
 }
 
-dl.getRandomString = (length) => {
-    let str = "";
-    for (let i=0; i<length; ++i) {
-        let charCode;
-        if (Math.random() < 0.5) charCode = dl.getRandomInt(65,90);
-        else charCode = dl.getRandomInt(97,122);
-        str += String.fromCharCode(charCode)
+const _charSets = {
+    lowercase: "abcdefghijklmnopqrstuvwxyz",
+    uppercase: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    numbers: "0123456789",
+    symbols: "!@#$%^&*()_+-=[]{}|;:,.<>?/\\",
+    similar: /[ilI1L0oOOD]/g
+};
+
+dl.getRandomString = (length, options = {}) => {
+    const opts = { ...{
+        lowercase: true,
+        uppercase: true,
+        numbers: true,
+        symbols: false,
+        excludeSimilar: false,
+        customPool: ""
+    }, ...options };
+
+    let pool = opts.customPool || "";
+    
+    if (!pool) {
+        if (opts.lowercase) pool += _charSets.lowercase;
+        if (opts.uppercase) pool += _charSets.uppercase;
+        if (opts.numbers)   pool += _charSets.numbers;
+        if (opts.symbols)   pool += _charSets.symbols;
     }
-    return str;
-}
+
+    if (opts.excludeSimilar) pool = pool.replace(_charSets.similar, "");
+
+    if (pool.length === 0) pool = _charSets.lowercase;
+
+    let result = "";
+    for (let i = 0; i < length; ++i) {
+        result += pool[dl.getRandomInt(0, pool.length - 1)];
+    }
+    
+    return result;
+};
 
 dl.loadImage = (filename) => {
     if (_imageCache[filename]) return _imageCache[filename];
@@ -455,16 +483,16 @@ dl.drawImageRec = (img, rect) => {
 dl.drawImagePro = (img, source, dest, origin, rotation, tint = 1.0) => {
     _ctx.save();
 
-    _ctx.translate(dest.x, dest.y);
-    _ctx.rotate(rotation * dl.DEG2RAD);
-    _ctx.translate(-origin.x, -origin.y);
-    _ctx.globalAlpha = tint;
+        _ctx.translate(dest.x, dest.y);
+        _ctx.rotate(rotation * dl.DEG2RAD);
+        _ctx.translate(-origin.x, -origin.y);
+        _ctx.globalAlpha = tint;
 
-    _ctx.drawImage(
-        img,
-        source.x, source.y, source.width, source.height,
-        0, 0, dest.width, dest.height
-    );
+        _ctx.drawImage(
+            img,
+            source.x, source.y, source.width, source.height,
+            0, 0, dest.width, dest.height
+        );
     
     _ctx.restore();
 };
@@ -786,9 +814,9 @@ dl.drawRectangleLinesEx = (rect, thickness, color) => {
     _ctx.lineTo(outerRect.x, outerRect.y + outerRect.height);
     _ctx.closePath();
     _ctx.save();
-    _ctx.strokeStyle = color;
-    _ctx.lineWidth = thickness;
-    _ctx.stroke();
+        _ctx.strokeStyle = color;
+        _ctx.lineWidth = thickness;
+        _ctx.stroke();
     _ctx.restore();
 }
 
@@ -819,28 +847,28 @@ dl.drawRectangleRoundedLines = (rect, roundness, color) => {
 
 dl.drawRectangleRoundedLinesEx = (rect, roundness, thickness, color) => {
     _ctx.save();
-    _ctx.lineWidth = thickness;
-    dl.drawRectangleRoundedLines(rect, roundness, color);
+        _ctx.lineWidth = thickness;
+        dl.drawRectangleRoundedLines(rect, roundness, color);
     _ctx.restore();
 }
 
 dl.drawSquareGrid = (x, y, cols, rows, cellSize, color = dl.LIGHTGRAY, lineThick = 1) => {
     _ctx.save();
-    _ctx.strokeStyle = color;
-    _ctx.lineWidth = lineThick;
+        _ctx.strokeStyle = color;
+        _ctx.lineWidth = lineThick;
 
-    _ctx.beginPath();
-    for (let i = 0; i <= cols; i++) {
-        const xPos = x + i * cellSize;
-        _ctx.moveTo(xPos, y);
-        _ctx.lineTo(xPos, y + rows * cellSize);
-    }
-    for (let j = 0; j <= rows; j++) {
-        const yPos = y + j * cellSize;
-        _ctx.moveTo(x, yPos);
-        _ctx.lineTo(x + cols * cellSize, yPos);
-    }
-    _ctx.stroke();
+        _ctx.beginPath();
+        for (let i = 0; i <= cols; i++) {
+            const xPos = x + i * cellSize;
+            _ctx.moveTo(xPos, y);
+            _ctx.lineTo(xPos, y + rows * cellSize);
+        }
+        for (let j = 0; j <= rows; j++) {
+            const yPos = y + j * cellSize;
+            _ctx.moveTo(x, yPos);
+            _ctx.lineTo(x + cols * cellSize, yPos);
+        }
+        _ctx.stroke();
     _ctx.restore();
 }
 
@@ -866,13 +894,13 @@ dl.drawLineStrip = (points, color) => {
         return;
     }
     _ctx.save();
-    _ctx.strokeStyle = color;
-    _ctx.beginPath();
-    _ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; ++i) {
-        _ctx.lineTo(points[i].x, points[i].y);
-    }
-    _ctx.stroke();
+        _ctx.strokeStyle = color;
+        _ctx.beginPath();
+        _ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; ++i) {
+            _ctx.lineTo(points[i].x, points[i].y);
+        }
+        _ctx.stroke();
     _ctx.restore();
 };
 
@@ -885,34 +913,34 @@ const _easeCubicInOut = (t, b, c, d) => {
 
 dl.drawLineBezier = (startPos, endPos, thick, color, curvatureFactor = 0.5) => {
     _ctx.save();
-    _ctx.strokeStyle = color;
-    _ctx.lineWidth = thick;
-    _ctx.lineCap = "round";
+        _ctx.strokeStyle = color;
+        _ctx.lineWidth = thick;
+        _ctx.lineCap = "round";
 
-    _ctx.beginPath();
-    _ctx.moveTo(startPos.x, startPos.y);
+        _ctx.beginPath();
+        _ctx.moveTo(startPos.x, startPos.y);
 
-    const midX = (startPos.x + endPos.x) / 2;
-    const midY = (startPos.y + endPos.y) / 2;
+        const midX = (startPos.x + endPos.x) / 2;
+        const midY = (startPos.y + endPos.y) / 2;
 
-    const dx = endPos.x - startPos.x;
-    const dy = endPos.y - startPos.y;
+        const dx = endPos.x - startPos.x;
+        const dy = endPos.y - startPos.y;
 
-    const length = Math.sqrt(dx * dx + dy * dy);
-    let normalPerpDx = 0;
-    let normalPerpDy = 0;
-    if (length > dl.FLT_EPSILON) {
-        normalPerpDx = -dy / length;
-        normalPerpDy = dx / length;
-    }
+        const length = Math.sqrt(dx * dx + dy * dy);
+        let normalPerpDx = 0;
+        let normalPerpDy = 0;
+        if (length > dl.FLT_EPSILON) {
+            normalPerpDx = -dy / length;
+            normalPerpDy = dx / length;
+        }
 
-    const offsetAmount = length * curvatureFactor;
-    const controlPointX = midX + normalPerpDx * offsetAmount;
-    const controlPointY = midY + normalPerpDy * offsetAmount;
+        const offsetAmount = length * curvatureFactor;
+        const controlPointX = midX + normalPerpDx * offsetAmount;
+        const controlPointY = midY + normalPerpDy * offsetAmount;
 
-    _ctx.quadraticCurveTo(controlPointX, controlPointY, endPos.x, endPos.y);
+        _ctx.quadraticCurveTo(controlPointX, controlPointY, endPos.x, endPos.y);
 
-    _ctx.stroke();
+        _ctx.stroke();
     _ctx.restore();
 };
 
@@ -940,8 +968,8 @@ dl.drawCircleLinesV = (center, radius, color) => {
 
 dl.drawCircleLinesEx = (center, radius, thickness, color) => {
     _ctx.save();
-    _ctx.lineWidth = thickness;
-    dl.drawCircleLinesV(center.x, center.y, radius, color);
+        _ctx.lineWidth = thickness;
+        dl.drawCircleLinesV(center.x, center.y, radius, color);
     _ctx.restore();
 }
 
@@ -1043,49 +1071,55 @@ const _drawTextInternal = (text, x, y, fontSize) => {
 dl.drawText = (text, x, y, size, color) => {
     if (!String(text).length) return;
     _ctx.save();
-    if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
-    _ctx.textAlign = "left";
-    _ctx.textBaseline = "top";
-    const fontSize = size || parseInt(_ctx.font);
-    const fontFamily = _ctx.font.split("px")[1];
-    dl.setFont(`${fontSize}px ${fontFamily}`);
-    _drawTextInternal(text, x, y, fontSize);
+        if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
+        _ctx.textAlign = "left";
+        _ctx.textBaseline = "top";
+        const fontSize = size || parseInt(_ctx.font);
+        const fontFamily = _ctx.font.split("px")[1];
+        dl.setFont(`${fontSize}px ${fontFamily}`);
+        _drawTextInternal(text, x, y, fontSize);
     _ctx.restore();
 };
 
 dl.drawTextCentered = (text, x, y, size, color) => {
     if (!String(text).length) return;
     _ctx.save();
-    if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
-    _ctx.textAlign = "center";
-    _ctx.textBaseline = "middle";
-    const fontSize = size || parseInt(_ctx.font);
-    const fontFamily = _ctx.font.split("px")[1];
-    dl.setFont(`${fontSize}px ${fontFamily}`);
-    
-    const lines = String(text).split('\n');
-    const lineSpacing = fontSize * 1.2;
-    const totalHeight = (lines.length - 1) * lineSpacing;
-    const startY = y - (totalHeight / 2);
-    
-    for (let i = 0; i < lines.length; i++) {
-        _ctx.fillText(lines[i], x, startY + (i * lineSpacing));
-    }
+        if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
+        _ctx.textAlign = "center";
+        _ctx.textBaseline = "alphabetic";
+
+        const fontSize = size || parseInt(_ctx.font);
+        const fontFamily = _ctx.font.split("px")[1];
+        dl.setFont(`${fontSize}px ${fontFamily}`);
+        
+        const lines = String(text).split('\n');
+        const lineSpacing = fontSize * 1.2;
+
+        const metrics = _ctx.measureText(lines[0]);
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.7;
+        
+        const totalHeight = (lines.length - 1) * lineSpacing + ascent;
+        let currentY = Math.round(y - (totalHeight / 2) + ascent);
+
+        for (let i = 0; i < lines.length; i++) {
+            _ctx.fillText(lines[i], x, currentY);
+            currentY += lineSpacing;
+        }
     _ctx.restore();
 };
 
 dl.drawTextEx = (text, x, y, size, color, align, baseline, { weight, style, font } = {}) => {
     if (!String(text).length) return;
     _ctx.save();
-    if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
-    if (align && _ctx.textAlign != align) _ctx.textAlign = align;
-    if (baseline && _ctx.textBaseline != baseline) _ctx.textBaseline = baseline;
-    const fontSize = size || parseInt(_ctx.font);
-    if (size || weight || style || font) {
-        const fontFamily = font || _ctx.font.split("px")[1];
-        dl.setFont(`${style || ""} ${weight || ""} ${fontSize}px ${fontFamily}`.trim());
-    }
-    _drawTextInternal(text, x, y, fontSize);
+        if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
+        if (align && _ctx.textAlign != align) _ctx.textAlign = align;
+        if (baseline && _ctx.textBaseline != baseline) _ctx.textBaseline = baseline;
+        const fontSize = size || parseInt(_ctx.font);
+        if (size || weight || style || font) {
+            const fontFamily = font || _ctx.font.split("px")[1];
+            dl.setFont(`${style || ""} ${weight || ""} ${fontSize}px ${fontFamily}`.trim());
+        }
+        _drawTextInternal(text, x, y, fontSize);
     _ctx.restore();
 };
 
@@ -1182,17 +1216,15 @@ dl.Button = class {
         this.cachedFont = `bold ${this.fontSize || 20}px monospace, system, sans-serif`;
 
         _ctx.save();
-        _ctx.font = this.cachedFont;
-
-        const leadingFactor = 1.8;
-
-        this.cachedLineHeights = this.textLines.map(line => {
-            const metrics = _ctx.measureText(line);
-            const ascent = metrics.actualBoundingBoxAscent ?? this.fontSize * 0.8;
-            const descent = metrics.actualBoundingBoxDescent ?? this.fontSize * 0.2;
-            const baseLineHeight = ascent + descent;
-            return baseLineHeight * leadingFactor;
-        });
+            _ctx.font = this.cachedFont;
+            const leadingFactor = 1.8;
+            this.cachedLineHeights = this.textLines.map(line => {
+                const metrics = _ctx.measureText(line);
+                const ascent = metrics.actualBoundingBoxAscent ?? this.fontSize * 0.8;
+                const descent = metrics.actualBoundingBoxDescent ?? this.fontSize * 0.2;
+                const baseLineHeight = ascent + descent;
+                return baseLineHeight * leadingFactor;
+            });
         _ctx.restore();
 
         const totalHeight = this.cachedLineHeights.reduce((a, b) => a + b, 0);
@@ -1271,14 +1303,14 @@ dl.Button = class {
         }
 
         _ctx.save();
-        _ctx.fillStyle = textColor;
-        _ctx.textAlign = "center";
-        _ctx.textBaseline = "middle";
-        _ctx.font = this.cachedFont;
+            _ctx.fillStyle = textColor;
+            _ctx.textAlign = "center";
+            _ctx.textBaseline = "middle";
+            _ctx.font = this.cachedFont;
 
-        for (let i = 0; i < this.textLines.length; ++i) {
-            _ctx.fillText(this.textLines[i], this.bounds.x + this.bounds.width / 2, this.textYOffsets[i]);
-        }
+            for (let i = 0; i < this.textLines.length; ++i) {
+                _ctx.fillText(this.textLines[i], this.bounds.x + this.bounds.width / 2, this.textYOffsets[i]);
+            }
         _ctx.restore();
     }
 };
@@ -1306,45 +1338,45 @@ dl.guiLabelButton = (id, x, y, text, options = {}) => {
     }
 
     _ctx.save();
-    _ctx.font = `${fontSize}px monospace, system, sans-serif`;
-    const lines = String(text).split("\n");
+        _ctx.font = `${fontSize}px monospace, system, sans-serif`;
+        const lines = String(text).split("\n");
 
-    const lineMetrics = lines.map(line => {
-        const m = _ctx.measureText(line);
-        const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
-        const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
-        return { width: m.width, height: ascent + descent };
-    });
+        const lineMetrics = lines.map(line => {
+            const m = _ctx.measureText(line);
+            const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
+            const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
+            return { width: m.width, height: ascent + descent };
+        });
 
-    const widest = Math.max(...lineMetrics.map(m => m.width));
-    const totalHeight = lineMetrics.reduce((a, b) => a + b.height, 0);
+        const widest = Math.max(...lineMetrics.map(m => m.width));
+        const totalHeight = lineMetrics.reduce((a, b) => a + b.height, 0);
 
-    const bounds = dl.Rectangle(x, y, widest, totalHeight);
+        const bounds = dl.Rectangle(x, y, widest, totalHeight);
 
-    let btn = _guiButtons.get(id);
-    if (!btn) {
-        btn = new dl.Button(bounds, text, { ...options, id, roundness: 0, borderThick: 0 });
-        _guiButtons.set(id, btn);
-    } else {
-        if (btn.text !== text) btn.setText(text);
-        btn.bounds = bounds;
-        btn.innerRect = dl.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
-    }
+        let btn = _guiButtons.get(id);
+        if (!btn) {
+            btn = new dl.Button(bounds, text, { ...options, id, roundness: 0, borderThick: 0 });
+            _guiButtons.set(id, btn);
+        } else {
+            if (btn.text !== text) btn.setText(text);
+            btn.bounds = bounds;
+            btn.innerRect = dl.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+        }
 
-    btn.update();
+        btn.update();
 
-    const textColor = btn._textColor || btn.style[btn.state][2];
+        const textColor = btn._textColor || btn.style[btn.state][2];
 
-    _ctx.fillStyle = textColor;
-    _ctx.textAlign = "left";
-    _ctx.textBaseline = "alphabetic";
-    _ctx.font = `${fontSize}px monospace, system, sans-serif`;
+        _ctx.fillStyle = textColor;
+        _ctx.textAlign = "left";
+        _ctx.textBaseline = "alphabetic";
+        _ctx.font = `${fontSize}px monospace, system, sans-serif`;
 
-    let yPos = y + lineMetrics[0].height - (lineMetrics[0].height * 0.2);
-    for (let i = 0; i < lines.length; ++i) {
-        _ctx.fillText(lines[i], x, yPos);
-        if (i < lines.length - 1) yPos += lineMetrics[i + 1].height;
-    }
+        let yPos = y + lineMetrics[0].height - (lineMetrics[0].height * 0.2);
+        for (let i = 0; i < lines.length; ++i) {
+            _ctx.fillText(lines[i], x, yPos);
+            if (i < lines.length - 1) yPos += lineMetrics[i + 1].height;
+        }
     _ctx.restore();
 
     return btn.isPressed();
