@@ -81,64 +81,106 @@ const _keyboard = {
     prev: {}
 };
 
+
 dl.Vector2 = (x = 0, y = 0) => ({ x, y });
-dl.Vector2Zero = () => dl.Vector2();
-dl.Vector2FromArray = (arr) => dl.Vector2(arr[0], arr[1]);
-dl.Vector2Add = (v1, v2) => dl.Vector2(v1.x + v2.x, v1.y + v2.y);
-dl.Vector2Subtract = (v1, v2) => dl.Vector2(v1.x - v2.x, v1.y - v2.y);
-dl.Vector2Multiply = (v1, v2) => dl.Vector2(v1.x * v2.x, v1.y * v2.y);
-dl.Vector2Divide = (v1, v2) => {
-    if (v2.x === 0 || v2.y === 0) return dl.Vector2(0, 0);
+dl.Vector2Zero = (out = null) => out ? (out.x = 0, out.y = 0, out) : dl.Vector2();
+dl.Vector2FromArray = (arr, out = null) => out ? (out.x = arr[0], out.y = arr[1], out) : dl.Vector2(arr[0], arr[1]);
+
+dl.Vector2Add = (v1, v2, out = null) => {
+    if (out) { out.x = v1.x + v2.x; out.y = v1.y + v2.y; return out; }
+    return dl.Vector2(v1.x + v2.x, v1.y + v2.y);
+};
+
+dl.Vector2Subtract = (v1, v2, out = null) => {
+    if (out) { out.x = v1.x - v2.x; out.y = v1.y - v2.y; return out; }
+    return dl.Vector2(v1.x - v2.x, v1.y - v2.y);
+};
+
+dl.Vector2Multiply = (v1, v2, out = null) => {
+    if (out) { out.x = v1.x * v2.x; out.y = v1.y * v2.y; return out; }
+    return dl.Vector2(v1.x * v2.x, v1.y * v2.y);
+};
+
+dl.Vector2Divide = (v1, v2, out = null) => {
+    if (v2.x === 0 || v2.y === 0) return out ? (out.x = 0, out.y = 0, out) : dl.Vector2(0, 0);
+    if (out) { out.x = v1.x / v2.x; out.y = v1.y / v2.y; return out; }
     return dl.Vector2(v1.x / v2.x, v1.y / v2.y);
 };
-dl.Vector2DivideScalar = (v, scalar) => {
-    if (scalar === 0) return dl.Vector2(0, 0);
+
+dl.Vector2DivideScalar = (v, scalar, out = null) => {
+    if (scalar === 0) return out ? (out.x = 0, out.y = 0, out) : dl.Vector2(0, 0);
+    if (out) { out.x = v.x / scalar; out.y = v.y / scalar; return out; }
     return dl.Vector2(v.x / scalar, v.y / scalar);
 };
-dl.Vector2Scale = (v, scalar) => dl.Vector2(v.x * scalar, v.y * scalar);
-dl.Vector2Magnitude = v => Math.sqrt((v.x * v.x) + (v.y * v.y));
-dl.Vector2Length = dl.Vector2Magnitude;
-dl.Vector2Lerp = (v1, v2, t) => dl.Vector2(dl.lerp(v1.x, v2.x, t), dl.lerp(v1.y, v2.y, t));
-dl.Vector2Normalize = v => {
-    const mag = dl.Vector2Magnitude(v);
-    return mag === 0 ? dl.Vector2() : dl.Vector2DivideScalar(v, mag);
+
+dl.Vector2Scale = (v, scalar, out = null) => {
+    if (out) { out.x = v.x * scalar; out.y = v.y * scalar; return out; }
+    return dl.Vector2(v.x * scalar, v.y * scalar);
 };
+
+dl.Vector2Lerp = (v1, v2, t, out = null) => {
+    const x = dl.lerp(v1.x, v2.x, t);
+    const y = dl.lerp(v1.y, v2.y, t);
+    if (out) { out.x = x; out.y = y; return out; }
+    return dl.Vector2(x, y);
+};
+
+dl.Vector2Normalize = (v, out = null) => {
+    const mag = Math.sqrt((v.x * v.x) + (v.y * v.y));
+    if (mag === 0) return out ? (out.x = 0, out.y = 0, out) : dl.Vector2();
+    return dl.Vector2Scale(v, 1 / mag, out);
+};
+
+dl.Vector2Copy = (v, out = null) => {
+    if (out) { out.x = v.x; out.y = v.y; return out; }
+    return dl.Vector2(v.x, v.y);
+};
+
+dl.Vector2MoveTowards = (v, target, maxDistance, out = null) => {
+    const dx = target.x - v.x;
+    const dy = target.y - v.y;
+    const sqrDist = dx * dx + dy * dy;
+    if (sqrDist === 0 || (maxDistance >= 0 && sqrDist <= maxDistance * maxDistance)) {
+        if (out) { out.x = target.x; out.y = target.y; return out; }
+        return dl.Vector2(target.x, target.y);
+    }
+    const dist = Math.sqrt(sqrDist);
+    const factor = maxDistance / dist;
+    if (out) { out.x = v.x + dx * factor; out.y = v.y + dy * factor; return out; }
+    return dl.Vector2(v.x + dx * factor, v.y + dy * factor);
+};
+
+dl.Vector2Rotate = (v, angle, out = null) => {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rx = v.x * cos - v.y * sin;
+    const ry = v.x * sin + v.y * cos;
+    if (out) { out.x = rx; out.y = ry; return out; }
+    return dl.Vector2(rx, ry);
+};
+
+dl.Vector2Reflect = (v, normal, out = null) => {
+    const dot = v.x * normal.x + v.y * normal.y;
+    const rx = v.x - 2 * dot * normal.x;
+    const ry = v.y - 2 * dot * normal.y;
+    if (out) { out.x = rx; out.y = ry; return out; }
+    return dl.Vector2(rx, ry);
+};
+
+
+dl.Vector2Magnitude = (v) => Math.sqrt((v.x * v.x) + (v.y * v.y));
+dl.Vector2Length = dl.Vector2Magnitude;
+
 dl.Vector2Dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
 dl.Vector2Cross = (v1, v2) => v1.x * v2.y - v1.y * v2.x;
 dl.Vector2Distance = (v1, v2) => Math.sqrt((v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y));
 dl.Vector2DistanceSqr = (v1, v2) => (v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y);
 dl.Vector2Equals = (v1, v2) => v1.x === v2.x && v1.y === v2.y;
-dl.Vector2Copy = v => dl.Vector2(v.x, v.y);
-dl.Vector2MoveTowards = (v, target, maxDistance) => {
-    const dx = target.x - v.x;
-    const dy = target.y - v.y;
-    const sqrDist = dx * dx + dy * dy;
-    if (sqrDist === 0 || (maxDistance >= 0 && sqrDist <= maxDistance * maxDistance)) {
-        return dl.Vector2(target.x, target.y);
-    }
-    const dist = Math.sqrt(sqrDist);
-    const factor = maxDistance / dist;
-    return dl.Vector2(v.x + dx * factor, v.y + dy * factor);
-};
-dl.Vector2Rotate = (v, angle) => {
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    return dl.Vector2(
-        v.x * cos - v.y * sin,
-        v.x * sin + v.y * cos
-    );
-};
 dl.Vector2Angle = (v1, v2) => v2 === undefined ? Math.atan2(v1.y, v1.x) : Math.atan2(v2.y - v1.y, v2.x - v1.x);
-dl.Vector2Reflect = (v, normal) => {
-    const dot = dl.Vector2Dot(v, normal);
-    return dl.Vector2(
-        v.x - 2 * dot * normal.x,
-        v.y - 2 * dot * normal.y
-    );
-};
+dl.Vector2ToString = (v) => `Vector2(${v.x.toFixed(2)}, ${v.y.toFixed(2)})`;
+dl.Vector2IsZero = (v, threshold = 0.00001) => (Math.abs(v.x) < threshold && Math.abs(v.y) < threshold);
 
 dl.Rectangle = (x, y, width, height) => ({ x, y, width, height });
-dl.Circle = (center, radius) => ({ center, radius });
 
 dl.clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 dl.lerp = (a, b, t) => a + (b - a) * t;
@@ -217,16 +259,16 @@ dl.initCanvas = ({ width, height, title = "untitled",
     window.onkeyup = e => {
         if (e.code in _keyboard) _keyboard[e.code] = false;
     };
-    canvas.onwheel = e => {
+    canvas.addEventListener("wheel", e => {
         e.preventDefault();
         _mouse.wheel = e.deltaY > 0 ? -1 : 1;
-    };
+    }, { passive: false });
 
     Object.assign(canvas.style, {
         maxWidth: "100%",
         maxHeight: "100%",
         imageRendering: antiAliasing ? "smooth" : "pixelated",
-        border: borderColor ? `1px solid ${borderColor}` : "none",
+        border: (borderColor && borderColor != "transparent") ? `1px solid ${borderColor}` : "none",
     });
 
     Object.assign(document.body.style, {
@@ -239,12 +281,13 @@ dl.initCanvas = ({ width, height, title = "untitled",
         overflow: "hidden",
     });
 
+    _ctx.canvas.style.backgroundColor = dl.BLACK;
+
     const styleSheet = document.styleSheets[0];
     styleSheet && styleSheet.insertRule(`
         * { 
             margin: 0; 
             padding: 0; 
-            box-sizing: border-box; 
         }
     `, styleSheet.cssRules.length);
 
@@ -277,12 +320,11 @@ dl.initCanvas = ({ width, height, title = "untitled",
         if (dl.main && typeof dl.main == "function") {
             _startGameLoop(dl.main);
         } else {
-            console.warn("missing dl.main()");
+            console.error("missing dl.main()");
         }
     };
 
     _firstTime = performance.now();
-
     return {
         width,
         height,
@@ -317,7 +359,6 @@ dl.getRandomString = (length) => {
 }
 
 dl.loadImage = (filename) => {
-
     if (_imageCache[filename]) return _imageCache[filename];
 
     const placeholder = new Image();
@@ -386,27 +427,17 @@ dl.drawSprite = (
     destWidth = spriteSheet.spriteWidth,
     destHeight = spriteSheet.spriteHeight
 ) => {
-    const { spriteWidth, spriteHeight } = spriteSheet;
+    const sw = spriteSheet.spriteWidth;
+    const sh = spriteSheet.spriteHeight;
 
-    const cacheKey = `${spriteSheet.src}_${spriteWidth}_${spriteHeight}_${colIndex - 1}_${rowIndex - 1}`;
+    const sx = (colIndex - 1) * sw;
+    const sy = (rowIndex - 1) * sh;
 
-    if (!_spriteCache.has(cacheKey)) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = spriteWidth;
-        canvas.height = spriteHeight;
-
-        const sourceX = (colIndex - 1) * spriteWidth;
-        const sourceY = (rowIndex - 1) * spriteHeight;
-        ctx.drawImage(spriteSheet, sourceX, sourceY, spriteWidth, spriteHeight, 0, 0, spriteWidth, spriteHeight);
-
-        const sprite = new Image();
-        sprite.src = canvas.toDataURL();
-        _spriteCache.set(cacheKey, sprite);
-    }
-
-    const cachedSprite = _spriteCache.get(cacheKey);
-    _ctx.drawImage(cachedSprite, destX, destY, destWidth, destHeight);
+    _ctx.drawImage(
+        spriteSheet, 
+        sx, sy, sw, sh,
+        destX, destY, destWidth, destHeight
+    );
 }
 
 dl.drawImage = (img, dx, dy) => {
@@ -475,13 +506,13 @@ dl.getCollisionRecBounds = (rect, bounds) => {
     return collision;
 }
 
-dl.getCollisionCircleBounds = (circle, bounds) => {
+dl.getCollisionCircleBounds = (center, radius, bounds) => {
     const collision = { left: false, right: false, top: false, bottom: false };
 
-    if (circle.center.x - circle.radius < bounds.x) collision.left = true;
-    if (circle.center.x + circle.radius > bounds.x + bounds.width) collision.right = true;
-    if (circle.center.y - circle.radius < bounds.y) collision.top = true;
-    if (circle.center.y + circle.radius > bounds.y + bounds.height) collision.bottom = true;
+    if (center.x - radius < bounds.x) collision.left = true;
+    if (center.x + radius > bounds.x + bounds.width) collision.right = true;
+    if (center.y - radius < bounds.y) collision.top = true;
+    if (center.y + radius > bounds.y + bounds.height) collision.bottom = true;
 
     return collision;
 }
@@ -516,26 +547,26 @@ dl.checkCollisionCircleLine = (center, radius, p1, p2) => {
     return distanceSQ <= radius * radius;
 };
 
-dl.checkCollisionCircleRec = (circle, rect) => {
-    const dx = circle.center.x - Math.max(rect.x, Math.min(circle.center.x, rect.x + rect.width));
-    const dy = circle.center.y - Math.max(rect.y, Math.min(circle.center.y, rect.y + rect.height));
-    return dx * dx + dy * dy <= circle.radius * circle.radius;
+dl.checkCollisionCircleRec = (center, radius, rect) => {
+    const dx = center.x - Math.max(rect.x, Math.min(center.x, rect.x + rect.width));
+    const dy = center.y - Math.max(rect.y, Math.min(center.y, rect.y + rect.height));
+    return dx*dx + dy*dy <= radius*radius;
 }
 
-dl.getCollisionCircleRec = (circle, rect) => {
+dl.getCollisionCircleRec = (center, radius, rect) => {
     const collision = { left: false, right: false, top: false, bottom: false };
 
-    const closestX = Math.max(rect.x, Math.min(circle.center.x, rect.x + rect.width));
-    const closestY = Math.max(rect.y, Math.min(circle.center.y, rect.y + rect.height));
+    const closestX = Math.max(rect.x, Math.min(center.x, rect.x + rect.width));
+    const closestY = Math.max(rect.y, Math.min(center.y, rect.y + rect.height));
 
-    const dx = circle.center.x - closestX;
-    const dy = circle.center.y - closestY;
+    const dx = center.x - closestX;
+    const dy = center.y - closestY;
 
-    if (dx * dx + dy * dy <= circle.radius * circle.radius) {
-        if (circle.center.x < rect.x) collision.left = true;
-        if (circle.center.x > rect.x + rect.width) collision.right = true;
-        if (circle.center.y < rect.y) collision.top = true;
-        if (circle.center.y > rect.y + rect.height) collision.bottom = true;
+    if (dx * dx + dy * dy <= radius * radius) {
+        if (center.x < rect.x) collision.left = true;
+        if (center.x > rect.x + rect.width) collision.right = true;
+        if (center.y < rect.y) collision.top = true;
+        if (center.y > rect.y + rect.height) collision.bottom = true;
     }
 
     return collision;
@@ -545,16 +576,71 @@ dl.checkCollisionPointRec = (point, rect) => {
     return point.x > rect.x && point.y > rect.y && point.x < rect.x + rect.width && point.y < rect.y + rect.height;
 }
 
-dl.checkCollisionPointCircle = (point, circle) => {
-    return Math.pow(point.x - circle.center.x, 2) + Math.pow(point.y - circle.center.y, 2) < Math.pow(circle.radius, 2);
+dl.checkCollisionPointCircle = (point, center, radius) => {
+    return Math.pow(point.x - center.x, 2) + Math.pow(point.y - center.y, 2) < radius * radius;
 }
 
-function _startGameLoop(callback) {
+dl.checkCollisionPointTriangle = (point, p1, p2, p3) => {
+    const alpha = ((p2.y - p3.y)*(point.x - p3.x) + (p3.x - p2.x)*(point.y - p3.y)) / ((p2.y - p3.y)*(p1.x - p3.x) + (p3.x - p2.x)*(p1.y - p3.y));
+    const beta = ((p3.y - p1.y)*(point.x - p3.x) + (p1.x - p3.x)*(point.y - p3.y)) / ((p2.y - p3.y)*(p1.x - p3.x) + (p3.x - p2.x)*(p1.y - p3.y));
+    const gamma = 1 - alpha - beta;
+
+    return alpha > 0 && beta > 0 && gamma > 0;
+}
+
+dl.checkCollisionLines = (startPos1, endPos1, startPos2, endPos2) => {
+    const den = (endPos2.y - startPos2.y) * (endPos1.x - startPos1.x) - (endPos2.x - startPos2.x) * (endPos1.y - startPos1.y);
+    if (den === 0) return false;
+
+    const ua = ((endPos2.x - startPos2.x) * (startPos1.y - startPos2.y) - (endPos2.y - startPos2.y) * (startPos1.x - startPos2.x)) / den;
+    const ub = ((endPos1.x - startPos1.x) * (startPos1.y - startPos2.y) - (endPos1.y - startPos1.y) * (startPos1.x - startPos2.x)) / den;
+
+    return (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1);
+};
+
+dl.checkCollisionPointLine = (point, p1, p2, threshold) => {
+    const dxc = point.x - p1.x;
+    const dyc = point.y - p1.y;
+    const dxl = p2.x - p1.x;
+    const dyl = p2.y - p1.y;
+    const cross = dxc * dyl - dyc * dxl;
+
+    if (Math.abs(cross) < threshold * Math.max(Math.abs(dxl), Math.abs(dyl))) {
+        if (Math.abs(dxl) >= Math.abs(dyl)) {
+            return dxl > 0 ? (p1.x <= point.x && point.x <= p2.x) : (p2.x <= point.x && point.x <= p1.x);
+        } else {
+            return dyl > 0 ? (p1.y <= point.y && point.y <= p2.y) : (p2.y <= point.y && point.y <= p1.y);
+        }
+    }
+
+    return false;
+};
+
+dl.checkCollisionCircleLine = (center, radius, p1, p2) => {
+    const dxl = p2.x - p1.x;
+    const dyl = p2.y - p1.y;
+    const dxp = center.x - p1.x;
+    const dyp = center.y - p1.y;
+
+    const lineLenSq = dxl * dxl + dyl * dyl;
+    const dot = (dxp * dxl + dyp * dyl) / lineLenSq;
+    const closest = {
+        x: p1.x + Math.max(0, Math.min(1, dot)) * dxl,
+        y: p1.y + Math.max(0, Math.min(1, dot)) * dyl
+    };
+
+    const distX = center.x - closest.x;
+    const distY = center.y - closest.y;
+
+    return (distX * distX + distY * distY) <= (radius * radius);
+};
+
+const _startGameLoop = (callback) => {
     _lastTime = performance.now();
     let isPageVisible = true;
     let frameRef;
 
-    function handleVisibilityChange() {
+    const handleVisibilityChange = () => {
         isPageVisible = !document.hidden;
         if (isPageVisible) {
             _lastTime = performance.now();
@@ -564,7 +650,7 @@ function _startGameLoop(callback) {
         }
     }
 
-    function loop(currentTime = 0) {
+    const loop = (currentTime = 0) => {
         _frameTime = (currentTime - _lastTime) / 1000;
         _lastTime = currentTime;
 
@@ -588,30 +674,28 @@ function _startGameLoop(callback) {
     frameRef = requestAnimationFrame(loop);
 }
 
-function _updatePrevMouseState() {
+const _updatePrevMouseState = () => {
     _mouse.prev[dl.LEFT_MOUSE_BUTTON] = _mouse[dl.LEFT_MOUSE_BUTTON];
     _mouse.prev[dl.MIDDLE_MOUSE_BUTTON] = _mouse[dl.MIDDLE_MOUSE_BUTTON];
     _mouse.prev[dl.RIGHT_MOUSE_BUTTON] = _mouse[dl.RIGHT_MOUSE_BUTTON];
 }
 
-function _updatePrevKeyboardState() {
+const _updatePrevKeyboardState = () => {
     for (const key in _keyboard) {
         _keyboard.prev[key] = _keyboard[key];
     }
 }
 
 dl.clearBackground = (color) => {
-    if (_ctx.canvas.style.backgroundColor != color) {
-        _ctx.canvas.style.backgroundColor = color;
-    }
-    _ctx.clearRect(0, 0, _ctx.canvas.width, _ctx.canvas.height);
+    _ctx.fillStyle = color;
+    _ctx.fillRect(0, 0, _ctx.canvas.width, _ctx.canvas.height);
 }
 
 dl.setLineThick = (thickness) => {
     _ctx.lineWidth = thickness;
 }
 
-function _parseColorString(color) {
+const _parseColorString = (color) => {
     if (typeof color !== 'string') return null;
     if (color.startsWith("#")) {
         if (color.length === 7) {
@@ -644,7 +728,7 @@ dl.fade = (color, alpha) => {
     }
 };
 
-function _updateFPS() {
+const _updateFPS = () => {
     _fpsSamples = _fpsSamples.filter(fps => fps !== Infinity);
     let currentFPS = 1 / _frameTime;
     _fpsSamples.push(currentFPS);
@@ -660,13 +744,13 @@ dl.drawFPS = (() => {
     let FPSTimer = 0;
     let lastFPS = 0;
 
-    return function (x, y, updateInterval = 250, fontSize = null) {
+    return (x, y, updateInterval = 500) => {
         FPSTimer += _frameTime * 1000;
         if (FPSTimer >= updateInterval) {
             lastFPS = dl.getFPS();
             FPSTimer = 0;
         }
-        dl.drawTextEx(`${lastFPS} FPS`, x, y, fontSize || _fpsFontSize, dl.LIME, "left", "top", { weight: "bold" });
+        dl.drawText(`${lastFPS} FPS`, x, y, _fpsFontSize, dl.LIME);
     };
 })();
 
@@ -785,14 +869,14 @@ dl.drawLineStrip = (points, color) => {
     _ctx.strokeStyle = color;
     _ctx.beginPath();
     _ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
+    for (let i = 1; i < points.length; ++i) {
         _ctx.lineTo(points[i].x, points[i].y);
     }
     _ctx.stroke();
     _ctx.restore();
 };
 
-function _easeCubicInOut(t, b, c, d) {
+const _easeCubicInOut = (t, b, c, d) => {
     t /= d / 2;
     if (t < 1) return c / 2 * t * t * t + b;
     t -= 2;
@@ -948,31 +1032,47 @@ dl.setFont = (newFont) => {
     }
 }
 
-dl.drawText = (text, x, y, size = null, color = null) => {
+const _drawTextInternal = (text, x, y, fontSize) => {
+    const lines = String(text).split('\n');
+    const lineSpacing = fontSize * 1.2;
+    for (let i = 0; i < lines.length; i++) {
+        _ctx.fillText(lines[i], x, y + (i * lineSpacing));
+    }
+};
+
+dl.drawText = (text, x, y, size, color) => {
     if (!String(text).length) return;
     _ctx.save();
     if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
     _ctx.textAlign = "left";
     _ctx.textBaseline = "top";
+    const fontSize = size || parseInt(_ctx.font);
     const fontFamily = _ctx.font.split("px")[1];
-    const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
-    dl.setFont(newFont);
-    _ctx.fillText(text, x, y);
+    dl.setFont(`${fontSize}px ${fontFamily}`);
+    _drawTextInternal(text, x, y, fontSize);
     _ctx.restore();
-}
+};
 
-dl.drawTextCentered = (text, x, y, size = null, color = null) => {
+dl.drawTextCentered = (text, x, y, size, color) => {
     if (!String(text).length) return;
     _ctx.save();
     if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
     _ctx.textAlign = "center";
     _ctx.textBaseline = "middle";
+    const fontSize = size || parseInt(_ctx.font);
     const fontFamily = _ctx.font.split("px")[1];
-    const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
-    dl.setFont(newFont);
-    _ctx.fillText(text, x, y);
+    dl.setFont(`${fontSize}px ${fontFamily}`);
+    
+    const lines = String(text).split('\n');
+    const lineSpacing = fontSize * 1.2;
+    const totalHeight = (lines.length - 1) * lineSpacing;
+    const startY = y - (totalHeight / 2);
+    
+    for (let i = 0; i < lines.length; i++) {
+        _ctx.fillText(lines[i], x, startY + (i * lineSpacing));
+    }
     _ctx.restore();
-}
+};
 
 dl.drawTextEx = (text, x, y, size, color, align, baseline, { weight, style, font } = {}) => {
     if (!String(text).length) return;
@@ -980,42 +1080,12 @@ dl.drawTextEx = (text, x, y, size, color, align, baseline, { weight, style, font
     if (color && _ctx.fillStyle != color) _ctx.fillStyle = color;
     if (align && _ctx.textAlign != align) _ctx.textAlign = align;
     if (baseline && _ctx.textBaseline != baseline) _ctx.textBaseline = baseline;
+    const fontSize = size || parseInt(_ctx.font);
     if (size || weight || style || font) {
         const fontFamily = font || _ctx.font.split("px")[1];
-        const newFont = `${style || ""} ${weight || ""} ${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
-        // const sanitizedNewFont = newFont.split(" ").filter(t => t).map(t => t.trim()).join(" ");
-        dl.setFont(newFont);
+        dl.setFont(`${style || ""} ${weight || ""} ${fontSize}px ${fontFamily}`.trim());
     }
-    _ctx.fillText(text, x, y);
-    _ctx.restore();
-}
-
-dl.drawTextAlongArc = (str, centerX, centerY, radius, angle, size = null, color = null) => {
-    const len = str.length;
-    if (len === 0) return;
-
-    _ctx.save();
-    if (color) _ctx.fillStyle = color;
-    if (size) {
-        const fontFamily = _ctx.font.split("px")[1];
-        dl.setFont(`${size}px ${fontFamily}`);
-    }
-
-    _ctx.textAlign = "center";
-    _ctx.textBaseline = "middle";
-    _ctx.translate(centerX, centerY);
-    _ctx.rotate((-angle) / 2);
-
-    const step = angle / len;
-    _ctx.rotate(step / 2);
-
-    for (let n = 0; n < len; ++n) {
-        _ctx.save();
-        _ctx.translate(0, -radius); 
-        _ctx.fillText(str[n], 0, 0);
-        _ctx.restore();
-        _ctx.rotate(step);
-    }
+    _drawTextInternal(text, x, y, fontSize);
     _ctx.restore();
 };
 
@@ -1192,7 +1262,7 @@ dl.Button = class {
         const borderColor = this._borderColor || this.style[this.state][1];
         const textColor = this._textColor || this.style[this.state][2];
 
-        if (this.roundness > 0) {
+        if (this.roundness) {
             dl.drawRectangleRoundedRec(this.bounds, this.roundness, borderColor);
             dl.drawRectangleRoundedRec(this.innerRect, this.roundness, innerColor);
         } else {
@@ -1213,12 +1283,17 @@ dl.Button = class {
     }
 };
 
-dl.guiButton = (id, bounds, text, options = {}) => {
-    let btn = _guiButtons.get(id);
+dl.guiButton = (bounds, text, options = {}) => {
+    const id = `x${Math.floor(bounds.x)}y${Math.floor(bounds.y)}`;
+    if (!_guiButtons.has(id)) _guiButtons.set(id, []);
+    const list = _guiButtons.get(id);
+
+    let btn = list.find(b => b.text === text);
     if (!btn) {
-        btn = new dl.Button(bounds, text, { ...options, id: id });
-        _guiButtons.set(id, btn);
+        btn = new dl.Button(bounds, text, options);
+        list.push(btn);
     }
+
     btn.update();
     btn.draw();
     return btn.isPressed();
@@ -1243,7 +1318,6 @@ dl.guiLabelButton = (id, x, y, text, options = {}) => {
 
     const widest = Math.max(...lineMetrics.map(m => m.width));
     const totalHeight = lineMetrics.reduce((a, b) => a + b.height, 0);
-    _ctx.restore();
 
     const bounds = dl.Rectangle(x, y, widest, totalHeight);
 
@@ -1260,7 +1334,7 @@ dl.guiLabelButton = (id, x, y, text, options = {}) => {
     btn.update();
 
     const textColor = btn._textColor || btn.style[btn.state][2];
-    _ctx.save();
+
     _ctx.fillStyle = textColor;
     _ctx.textAlign = "left";
     _ctx.textBaseline = "alphabetic";
@@ -1274,6 +1348,10 @@ dl.guiLabelButton = (id, x, y, text, options = {}) => {
     _ctx.restore();
 
     return btn.isPressed();
+};
+
+dl.clearGuiCache = () => {
+    _guiButtons.clear();
 };
 
 dl.openURL = (url) => {
@@ -1351,4 +1429,3 @@ dl.playSound = (path, volume = 1.0, pitch = 1.0) => {
     gainNode.connect(_masterGain);
     source.start(0);
 };
-
