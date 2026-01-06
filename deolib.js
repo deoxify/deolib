@@ -958,6 +958,7 @@ dl.drawText = (text, x, y, size = null, color = null) => {
     const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
     dl.setFont(newFont);
     _ctx.fillText(text, x, y);
+    _ctx.restore();
 }
 
 dl.drawTextCentered = (text, x, y, size = null, color = null) => {
@@ -970,6 +971,7 @@ dl.drawTextCentered = (text, x, y, size = null, color = null) => {
     const newFont = `${size || parseInt(_ctx.font)}px ${fontFamily}`.trim();
     dl.setFont(newFont);
     _ctx.fillText(text, x, y);
+    _ctx.restore();
 }
 
 dl.drawTextEx = (text, x, y, size, color, align, baseline, { weight, style, font } = {}) => {
@@ -1349,3 +1351,4 @@ dl.playSound = (path, volume = 1.0, pitch = 1.0) => {
     gainNode.connect(_masterGain);
     source.start(0);
 };
+
