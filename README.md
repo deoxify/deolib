@@ -38,7 +38,7 @@ const config = dl.initCanvas({ width: 640, height: 480, title: "test" });
 
 dl.main = () => {
     dl.clearBackground(dl.BLACK);
-    dl.drawTextCentered("Hello, World!", config.width/2, config.height/2, 48, dl.GOLD);
+    dl.drawTextCentered("Hello\nWorld", config.width/2, config.height/2, 48, dl.MAROON);
 };
 ```
 
@@ -235,9 +235,9 @@ dl.main = () => {
 ## Buttons
 Buttons are evaluated and drawn every frame (immediate-mode).
 
-State is internally cached using user-provided IDs, allowing interaction to persist across frames.
+State is internally cached, allowing interaction to persist across frames.
 
-## `dl.guiButton(id: string, bounds:`[`dl.Rectangle`](#dlrectangle)`, text, options?: ButtonOptions) → boolean`
+## `dl.guiButton(bounds:`[`dl.Rectangle`](#dlrectangle)`, text, options?: ButtonOptions) → boolean`
 Draws and updates a button.
 Returns true **on the frame** the button is clicked.
 ### ButtonOptions
@@ -256,11 +256,7 @@ dl.initCanvas({ width: 640, height: 480, title: "buttons" });
 dl.main = () => {
     dl.clearBackground(dl.COAL);
 
-    if(dl.guiButton(
-        "btnPlay", 
-        dl.Rectangle(250, 220, 150, 50),
-        "Play"
-    )) {
+    if(dl.guiButton(dl.Rectangle(250, 220, 150, 50), "Play")) {
         dl.playSound("https://cdn.freesound.org/previews/62/62980_76945-lq.mp3");
     }
 }
@@ -269,21 +265,32 @@ dl.main = () => {
 
 For full control, buttons can be managed manually using the `dl.Button` class.
 
-Since it is an instance, the `id` is no longer needed.
-
 ```js
 dl.initCanvas({ width: 640, height: 480, title: "buttons" });
 
-const button = new dl.Button(dl.Rectangle(250, 220, 150, 50), "Click Me");
+let countdown = 10;
+const button = new dl.Button(dl.Rectangle(250, 200, 150, 80), countdown);
 
 dl.main = () => {
     button.update();
 
     if (button.isPressed()) {
-        console.log("pressed");
+        button.setText(--countdown);
+        
+        if (countdown <= 0) {
+            button.disable();
+        }
+    }
+    
+    if (dl.isKeyPressed("KeyR")) {
+        countdown = 10;
+        button.setText(countdown);
+        button.enable();
     }
 
     dl.clearBackground(dl.BLACK);
     button.draw();
 };
 ```
+
+...
