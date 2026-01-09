@@ -1,18 +1,19 @@
-let _ctx;
-let _firstTime;
-let _lastTime;
-let _frameTime;
-let _fps;
-let _avgFPS;
-let _fpsFontSize;
-let _cachedFont;
-let _fpsSamples = [];
-let _masterGain = null;
+"use strict";
 
-const _imageCache = {};
+let _ctx,
+    _firstTime,
+    _lastTime,
+    _frameTime,
+    _fps,
+    _avgFPS,
+    _fpsFontSize,
+    _cachedFont,
+    _fpsSamples = [],
+    _masterGain = null;
+
+const _imageCache = new Map();
 const _spriteCache = new Map();
 const _guiButtons = new Map();
-
 const _audioCache = new Map();
 const _audioCtx = new AudioContext();
 
@@ -175,8 +176,8 @@ dl.Vector2Dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
 dl.Vector2Cross = (v1, v2) => v1.x * v2.y - v1.y * v2.x;
 dl.Vector2Distance = (v1, v2) => Math.sqrt((v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y));
 dl.Vector2DistanceSqr = (v1, v2) => (v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y);
-dl.Vector2Equals = (v1, v2) => v1.x === v2.x && v1.y === v2.y;
-dl.Vector2Angle = (v1, v2) => v2 === undefined ? Math.atan2(v1.y, v1.x) : Math.atan2(v2.y - v1.y, v2.x - v1.x);
+dl.Vector2Equals = (v1, v2) => v1.x == v2.x && v1.y == v2.y;
+dl.Vector2Angle = (v1, v2) => v2 == undefined ? Math.atan2(v1.y, v1.x) : Math.atan2(v2.y - v1.y, v2.x - v1.x);
 dl.Vector2ToString = (v) => `Vector2(${v.x.toFixed(2)}, ${v.y.toFixed(2)})`;
 dl.Vector2IsZero = (v, threshold = 0.00001) => (Math.abs(v.x) < threshold && Math.abs(v.y) < threshold);
 
@@ -190,13 +191,13 @@ dl.isMouseButtonDown = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse &
 dl.isMouseButtonUp = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && !_mouse[buttonId];
 dl.isMouseButtonPressed = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && !_mouse.prev[buttonId] && _mouse[buttonId];
 dl.isMouseButtonReleased = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && _mouse.prev[buttonId] && !_mouse[buttonId];
-dl.isKeyDown = keyCode => keyCode in _keyboard && _keyboard[keyCode];
-dl.isKeyUp = keyCode => keyCode in _keyboard && !_keyboard[keyCode];
-dl.isKeyPressed = keyCode => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
-dl.isKeyReleased = keyCode => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
+dl.isKeyDown = (keyCode) => keyCode in _keyboard && _keyboard[keyCode];
+dl.isKeyUp = (keyCode) => keyCode in _keyboard && !_keyboard[keyCode];
+dl.isKeyPressed = (keyCode) => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
+dl.isKeyReleased = (keyCode) => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
 dl.getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 dl.getRandomFloat = (min, max) => Math.random() * (max - min) + min;
-dl.getRandomElem = arr => arr[dl.getRandomInt(0, arr.length - 1)];
+dl.getRandomElem = (arr) => arr[dl.getRandomInt(0, arr.length - 1)];
 dl.getRandomColor = () => `#${(c => c < 0x202020 ? dl.getRandomColor().slice(1) : c.toString(16).padStart(6, '0'))((Math.random() * 0xffffff) << 0)}`;
 dl.getMousePosition = () => dl.Vector2(Math.round(_mouse.currentFrameX), Math.round(_mouse.currentFrameY));
 dl.getMouseDelta = () => dl.Vector2(_mouse.currentFrameX - _mouse.prevX, _mouse.currentFrameY - _mouse.prevY);
@@ -212,59 +213,104 @@ dl.getCanvasHeight = () => _ctx.canvas.height;
 dl.getCanvasRect = () => dl.Rectangle(0, 0, _ctx.canvas.width, _ctx.canvas.height);
 dl.getCanvasCenter = () => dl.Vector2(_ctx.canvas.width>>1, _ctx.canvas.height>>1);
 dl.getFrameTime = () => _frameTime;
-dl.getFPS = () => _fps;
+dl.getFPS = () => _avgFPS || 0;
 dl.getTime = () => (performance.now() - _firstTime) / 1000;
 
 dl.hideCursor = () => _ctx.canvas.style.cursor = dl.CURSOR_HIDDEN;
 dl.showCursor = () => _ctx.canvas.style.cursor = dl.CURSOR_DEFAULT;
 
-dl.initCanvas = ({ width, height, title = "untitled",
-    showContextMenu = false, autoExpand = false, pageBgColor = "#282828", antiAliasing = true,
-    borderColor = "transparent" }) => {
+dl.initCanvas = ({
+    width,
+    height,
+    title = "untitled",
+    showContextMenu = false,
+    autoExpand = false,
+    pageBgColor = "#282828",
+    antiAliasing = true,
+    borderColor = "transparent"
+}) => {
     const canvas = document.createElement("canvas");
     _ctx = canvas.getContext("2d");
-    canvas.width = width;
-    canvas.height = height;
+    dl._canvas = canvas;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    _ctx.scale(dpr, dpr);
+
     const ar = width / height;
-    function onresize() {
-        if (innerWidth / innerHeight > ar) {
-            canvas.style.width = `${Math.round(innerHeight * ar)}px`;
-            canvas.style.height = `${Math.round(innerHeight)}px`;
+
+    const setCanvasDisplaySize = () => {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        let displayW, displayH;
+        
+        if (autoExpand) {
+            if (winW / winH > ar) {
+                displayW = winH * ar;
+                displayH = winH;
+            } else {
+                displayW = winW;
+                displayH = winW / ar;
+            }
         } else {
-            canvas.style.width = `${Math.round(innerWidth)}px`;
-            canvas.style.height = `${Math.round(innerWidth / ar)}px`;
+            displayW = Math.min(width, winW);
+            displayH = displayW / ar;
+            if (displayH > winH) {
+                displayH = winH;
+                displayW = displayH * ar;
+            }
         }
-    }
-    canvas.oncontextmenu = e => { if (!showContextMenu) e.preventDefault(); }
-    window.onresize = autoExpand ? onresize : window.onresize;
+
+        canvas.style.width = `${displayW}px`;
+        canvas.style.height = `${displayH}px`;
+        if (_cachedFont) _ctx.font = _cachedFont;
+    };
+
+    window.addEventListener("resize", setCanvasDisplaySize);
+    canvas.oncontextmenu = (e) => { if (!showContextMenu) e.preventDefault(); }
     canvas.onpointerenter = () => (_mouse.isInCanvas = true);
-    canvas.onpointerleave = () => ((_mouse.isInCanvas = false));
-    canvas.onpointermove = e => {
+    canvas.onpointerleave = () => (_mouse.isInCanvas = false);
+    canvas.onpointermove = (e) => {
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        _mouse.x = (e.clientX - rect.left) * scaleX;
-        _mouse.y = (e.clientY - rect.top) * scaleY;
+        const style = window.getComputedStyle(canvas);
+        const borderL = parseFloat(style.borderLeftWidth) || 0;
+        const borderT = parseFloat(style.borderTopWidth) || 0;
+        const padL = parseFloat(style.paddingLeft) || 0;
+        const padT = parseFloat(style.paddingTop) || 0;
+
+        const contentW = rect.width - borderL - parseFloat(style.borderRightWidth) - padL - parseFloat(style.paddingRight);
+        const contentH = rect.height - borderT - parseFloat(style.borderBottomWidth) - padT - parseFloat(style.paddingBottom);
+
+        const scaleX = width / contentW;
+        const scaleY = height / contentH;
+
+        _mouse.x = (e.clientX - rect.left - borderL - padL) * scaleX;
+        _mouse.y = (e.clientY - rect.top - borderT - padT) * scaleY;
     };
-    canvas.onpointerdown = e => {
+    canvas.onpointerdown = (e) => {
         if (_mouse.isInCanvas) _mouse[e.button] = true;
-        if (_audioCtx.state === 'suspended') _audioCtx.resume();
+        if (_audioCtx.state == "suspended") _audioCtx.resume();
     };
-    canvas.onpointerup = e => {
+    canvas.onpointerup = (e) => {
         if (_mouse.isInCanvas) _mouse[e.button] = false;
     };
-    window.onkeydown = e => {
+    window.onkeydown = (e) => {
         if (e.code.length) _keyboard[e.code] = true;
     };
-    window.onkeyup = e => {
+    window.onkeyup = (e) => {
         if (e.code in _keyboard) _keyboard[e.code] = false;
     };
-    canvas.addEventListener("wheel", e => {
+    canvas.addEventListener("wheel", (e) => {
         e.preventDefault();
         _mouse.wheel = e.deltaY > 0 ? -1 : 1;
     }, { passive: false });
 
     Object.assign(canvas.style, {
+        display: "block",
+        boxSizing: "border-box",
         maxWidth: "100%",
         maxHeight: "100%",
         imageRendering: antiAliasing ? "smooth" : "pixelated",
@@ -273,6 +319,8 @@ dl.initCanvas = ({ width, height, title = "untitled",
 
     Object.assign(document.body.style, {
         backgroundColor: pageBgColor,
+        margin: "0",
+        padding: "0",
         width: "100vw",
         height: "100vh",
         display: "flex",
@@ -281,15 +329,15 @@ dl.initCanvas = ({ width, height, title = "untitled",
         overflow: "hidden",
     });
 
-    _ctx.canvas.style.backgroundColor = dl.BLACK;
+    _ctx.canvas.style.backgroundColor = dl.WHITE;
 
-    const styleSheet = document.styleSheets[0];
-    styleSheet && styleSheet.insertRule(`
-        * { 
-            margin: 0; 
-            padding: 0; 
-        }
-    `, styleSheet.cssRules.length);
+    let styleSheet = document.styleSheets[0];
+    if (!styleSheet) {
+        const s = document.createElement("style");
+        document.head.appendChild(s);
+        styleSheet = s.sheet;
+    }
+    styleSheet.insertRule(`* { margin: 0; padding: 0; box-sizing: border-box; }`, styleSheet.cssRules.length);
 
     const link = document.createElement('link');
     link.rel = "icon";
@@ -300,7 +348,6 @@ dl.initCanvas = ({ width, height, title = "untitled",
     link.href += "7WRayVSAMIhigwQweaKBVgQERhe6QmVwKmEruiOftrIL8sZuZeUr7nrkKEhA";
     link.href += "yx/Ta6Zm92c1VYAjd7Md3Pm0VCBOCvZdFn28VJOgoRJsHc68CooMObcKf2iq";
     link.href += "YxtP9BwAA///OEEeOAAAABklEQVQDABh30CG/IL+KAAAAAElFTkSuQmCC";
-
     document.head.appendChild(link);
 
     window.onload = () => {
@@ -312,19 +359,15 @@ dl.initCanvas = ({ width, height, title = "untitled",
         const w = _ctx.canvas.width;
         const h = _ctx.canvas.height;
         _fpsFontSize = Math.floor(Math.sqrt(w * w + h * h) / 50);
-        _ctx.textRendering = "geometricPrecision";
         _ctx.imageSmoothingEnabled = antiAliasing;
-        _ctx.lineWidth = 2;
         dl.setFont("20px monospace, system, sans-serif");
-        if (autoExpand) onresize();
-        if (dl.main && typeof dl.main == "function") {
-            _startGameLoop(dl.main);
-        } else {
-            console.error("missing dl.main()");
-        }
+        setCanvasDisplaySize();
+        if (dl.main) _startGameLoop(dl.main);
+        else console.error("missing dl.main()");
     };
 
     _firstTime = performance.now();
+
     return {
         width,
         height,
@@ -386,65 +429,30 @@ dl.getRandomString = (length, options = {}) => {
     return result;
 };
 
-dl.loadImage = (filename) => {
-    if (_imageCache[filename]) return _imageCache[filename];
+const _loadGenericImage = (fileName, spriteWidth = null, spriteHeight = null) => {
+    if (_imageCache.has(fileName)) return _imageCache.get(fileName);
 
     const placeholder = new Image();
-    placeholder.src = "";
-
     const img = new Image();
-    img.src = filename;
+    
+    const meta = { spriteWidth, spriteHeight };
+    Object.assign(placeholder, meta);
 
     img.onload = () => {
-        _imageCache[filename] = img;
+        Object.assign(img, meta);
+        _imageCache.set(fileName, img);
         Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
     };
-    img.onerror = err => console.error(`Failed to load image: ${filename}`, err);
+    
+    img.onerror = err => console.error(`Failed to load: ${fileName}`, err);
+    img.src = fileName;
 
-    _imageCache[filename] = placeholder;
+    _imageCache.set(fileName, placeholder);
     return placeholder;
-}
+};
 
-dl.Image = class {
-    constructor(source) {
-
-        const placeholder = new Image();
-        placeholder.src = "";
-
-        const img = new Image();
-        img.src = source;
-
-        img.onload = () => 
-            Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
-
-        img.onerror = err => 
-            console.error(`Failed to load image: ${source}`, err);
-
-        this.img = placeholder;
-    }
-
-    draw(x, y) {
-        _ctx.drawImage(this.img, x, y);
-    }
-}
-
-dl.loadSpreadSheet = (filename, spriteWidth, spriteHeight) => {
-    if (_imageCache[filename]) return _imageCache[filename];
-
-    const placeholder = new Image();
-    placeholder.src = "";
-
-    const img = new Image();
-    img.onload = () => {
-        _imageCache[filename] = Object.assign(img, { spriteWidth, spriteHeight });
-        Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
-    };
-    img.onerror = err => console.error(`Failed to load image: ${filename}`, err);
-    img.src = filename;
-
-    _imageCache[filename] = Object.assign(placeholder, { spriteWidth, spriteHeight });
-    return _imageCache[filename];
-}
+dl.loadImage = (fileName) => _loadGenericImage(fileName);
+dl.loadSpreadSheet = (fileName, sw, sh) => _loadGenericImage(fileName, sw, sh);
 
 dl.drawSprite = (
     spriteSheet,
@@ -665,27 +673,29 @@ dl.checkCollisionCircleLine = (center, radius, p1, p2) => {
 
 const _startGameLoop = (callback) => {
     _lastTime = performance.now();
-    let isPageVisible = true;
     let frameRef;
 
     const handleVisibilityChange = () => {
-        isPageVisible = !document.hidden;
-        if (isPageVisible) {
+        if (!document.hidden) {
             _lastTime = performance.now();
-            frameRef = requestAnimationFrame(loop);
-        } else {
-            cancelAnimationFrame(frameRef);
         }
-    }
+    };
 
-    const loop = (currentTime = 0) => {
-        _frameTime = (currentTime - _lastTime) / 1000;
+    const loop = (currentTime) => {
+        if (!currentTime) currentTime = performance.now();
+
+        const deltaTimeMS = currentTime - _lastTime;
         _lastTime = currentTime;
+        _frameTime = deltaTimeMS / 1000;
+
+        if (_frameTime > 0.1) _frameTime = 1.0 / 60.0;
 
         try {
             _mouse.currentFrameX = _mouse.x;
             _mouse.currentFrameY = _mouse.y;
-            _updateFPS();
+            
+            _updateFPS(deltaTimeMS); 
+            
             callback();
 
             _updatePrevMouseState();
@@ -695,12 +705,19 @@ const _startGameLoop = (callback) => {
             
             frameRef = requestAnimationFrame(loop);
         } catch (e) {
-            console.error(e);
+            console.error("Game Loop Error:", e);
         }
-    }
-    document.onvisibilitychange = handleVisibilityChange;
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     frameRef = requestAnimationFrame(loop);
-}
+};
+
+dl.setTargetFPS = (fps) => {
+    _targetFPS = fps;
+    _targetFrameTime = fps > 0 ? (1000 / fps) : 0;
+    setTimeout(()=>{console.log(dl.getFrameTime())}, 1000);
+};
 
 const _updatePrevMouseState = () => {
     _mouse.prev[dl.LEFT_MOUSE_BUTTON] = _mouse[dl.LEFT_MOUSE_BUTTON];
@@ -756,17 +773,17 @@ dl.fade = (color, alpha) => {
     }
 };
 
-const _updateFPS = () => {
-    _fpsSamples = _fpsSamples.filter(fps => fps !== Infinity);
-    let currentFPS = 1 / _frameTime;
+const _updateFPS = (dtMS) => {
+    if (dtMS <= 0) return;
+    const currentFPS = 1000 / dtMS;
     _fpsSamples.push(currentFPS);
+    if (_fpsSamples.length > 60) _fpsSamples.shift();
+    
+    const sum = _fpsSamples.reduce((a, b) => a + b, 0);
+    _avgFPS = Math.round(sum / _fpsSamples.length) || 0;
+};
 
-    if (_fpsSamples.length > 20) {
-        _fpsSamples.shift();
-    }
-    _avgFPS = _fpsSamples.reduce((sum, fps) => sum + fps, 0) / _fpsSamples.length;
-    _fps = Math.floor(_avgFPS);
-}
+
 
 dl.drawFPS = (() => {
     let FPSTimer = 0;
@@ -782,18 +799,24 @@ dl.drawFPS = (() => {
     };
 })();
 
+
+
 dl.drawRectangle = (x, y, width, height, color) => {
     _ctx.fillStyle = color;
     _ctx.fillRect(x, y, width, height);
 }
 
+dl.drawRectangleRec = (rect, color) => {
+    dl.drawRectangle(rect.x, rect.y, rect.width, rect.height, color);
+}
+
+dl.drawRectangleV = (pos, size, color) => {
+    dl.drawRectangle(pos.x, pos.y, size.x, size.y, color);
+}
+
 dl.drawRectangleLines = (x, y, width, height, color) => {
     _ctx.strokeStyle = color;
     _ctx.strokeRect(x, y, width, height);
-}
-
-dl.drawRectangleRec = (rect, color) => {
-    dl.drawRectangle(rect.x, rect.y, rect.width, rect.height, color);
 }
 
 dl.drawRectangleLinesRec = (rect, color) => {
@@ -820,9 +843,7 @@ dl.drawRectangleLinesEx = (rect, thickness, color) => {
     _ctx.restore();
 }
 
-dl.drawRectangleV = (pos, size, color) => {
-    dl.drawRectangle(pos.x, pos.y, size.x, size.y, color);
-}
+
 
 dl.drawRectangleRounded = (x, y, width, height, roundness, color) => {
     _ctx.beginPath();
@@ -902,13 +923,6 @@ dl.drawLineStrip = (points, color) => {
         }
         _ctx.stroke();
     _ctx.restore();
-};
-
-const _easeCubicInOut = (t, b, c, d) => {
-    t /= d / 2;
-    if (t < 1) return c / 2 * t * t * t + b;
-    t -= 2;
-    return c / 2 * (t * t * t + 2) + b;
 };
 
 dl.drawLineBezier = (startPos, endPos, thick, color, curvatureFactor = 0.5) => {
@@ -1013,6 +1027,13 @@ dl.drawRingLinesV = (center, innerRadius, outerRadius, color) => {
     _ctx.stroke();
 };
 
+dl.drawPoly = (center, sides, radius, rotation, color) => {
+    if (sides < 3) return;
+    dl.drawPolyLines(center, sides, radius, rotation);
+    _ctx.fillStyle = color;
+    _ctx.fill();
+}
+
 dl.drawPolyLines = (center, sides, radius, rotation, color) => {
     if (sides < 3) return;
     _ctx.beginPath();
@@ -1024,13 +1045,6 @@ dl.drawPolyLines = (center, sides, radius, rotation, color) => {
     _ctx.closePath();
     _ctx.strokeStyle = color;
     _ctx.stroke();
-}
-
-dl.drawPoly = (center, sides, radius, rotation, color) => {
-    if (sides < 3) return;
-    dl.drawPolyLines(center, sides, radius, rotation);
-    _ctx.fillStyle = color;
-    _ctx.fill();
 }
 
 dl.drawTriangle = (v1, v2, v3, color) => {
@@ -1218,7 +1232,7 @@ dl.Button = class {
         _ctx.save();
             _ctx.font = this.cachedFont;
             const leadingFactor = 1.8;
-            this.cachedLineHeights = this.textLines.map(line => {
+            this.cachedLineHeights = this.textLines.map((line) => {
                 const metrics = _ctx.measureText(line);
                 const ascent = metrics.actualBoundingBoxAscent ?? this.fontSize * 0.8;
                 const descent = metrics.actualBoundingBoxDescent ?? this.fontSize * 0.2;
@@ -1231,7 +1245,7 @@ dl.Button = class {
         const startY = this.bounds.y + (this.bounds.height - totalHeight) / 2;
 
         let currentY = startY;
-        this.textYOffsets = this.cachedLineHeights.map(height => {
+        this.textYOffsets = this.cachedLineHeights.map((height) => {
             const y = currentY + (height / 2);
             currentY += height;
             return Math.floor(y);
@@ -1277,6 +1291,10 @@ dl.Button = class {
         return this._clickedThisFrame;
     }
 
+    setStyle(style) {
+        this.style = style;
+    }
+
     setInnerColor(color) { 
         this._innerColor = color || null;
     }
@@ -1287,6 +1305,12 @@ dl.Button = class {
     
     setTextColor(color) {
         this._textColor = color || null;
+    }
+
+    resetColors() {
+        this._innerColor = this.style[this.state][0];
+        this._borderColor = this.style[this.state][1];
+        this._textColor = this.style[this.state][2];
     }
 
     draw() {
@@ -1320,7 +1344,7 @@ dl.guiButton = (bounds, text, options = {}) => {
     if (!_guiButtons.has(id)) _guiButtons.set(id, []);
     const list = _guiButtons.get(id);
 
-    let btn = list.find(b => b.text === text);
+    let btn = list.find((b) => b.text === text);
     if (!btn) {
         btn = new dl.Button(bounds, text, options);
         list.push(btn);
@@ -1328,57 +1352,6 @@ dl.guiButton = (bounds, text, options = {}) => {
 
     btn.update();
     btn.draw();
-    return btn.isPressed();
-};
-
-dl.guiLabelButton = (id, x, y, text, options = {}) => {
-    const fontSize = options.fontSize || 20;
-    if (!options.style) {
-        options.style = dl.BS_GENESIS;
-    }
-
-    _ctx.save();
-        _ctx.font = `${fontSize}px monospace, system, sans-serif`;
-        const lines = String(text).split("\n");
-
-        const lineMetrics = lines.map(line => {
-            const m = _ctx.measureText(line);
-            const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
-            const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
-            return { width: m.width, height: ascent + descent };
-        });
-
-        const widest = Math.max(...lineMetrics.map(m => m.width));
-        const totalHeight = lineMetrics.reduce((a, b) => a + b.height, 0);
-
-        const bounds = dl.Rectangle(x, y, widest, totalHeight);
-
-        let btn = _guiButtons.get(id);
-        if (!btn) {
-            btn = new dl.Button(bounds, text, { ...options, id, roundness: 0, borderThick: 0 });
-            _guiButtons.set(id, btn);
-        } else {
-            if (btn.text !== text) btn.setText(text);
-            btn.bounds = bounds;
-            btn.innerRect = dl.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-        btn.update();
-
-        const textColor = btn._textColor || btn.style[btn.state][2];
-
-        _ctx.fillStyle = textColor;
-        _ctx.textAlign = "left";
-        _ctx.textBaseline = "alphabetic";
-        _ctx.font = `${fontSize}px monospace, system, sans-serif`;
-
-        let yPos = y + lineMetrics[0].height - (lineMetrics[0].height * 0.2);
-        for (let i = 0; i < lines.length; ++i) {
-            _ctx.fillText(lines[i], x, yPos);
-            if (i < lines.length - 1) yPos += lineMetrics[i + 1].height;
-        }
-    _ctx.restore();
-
     return btn.isPressed();
 };
 
@@ -1444,7 +1417,7 @@ dl.playSound = (path, volume = 1.0, pitch = 1.0) => {
     const buffer = _audioCache.get(path);
     
     if (!buffer) {
-        _loadSound(path).then(newBuffer => {
+        _loadSound(path).then((newBuffer) => {
             if (newBuffer) dl.playSound(path, volume, pitch);
         });
         return;
