@@ -8,8 +8,8 @@ let _ctx,
     _avgFPS,
     _fpsFontSize,
     _cachedFont,
-    _fpsSamples = [],
-    _masterGain = null;
+    _masterGain,
+    _fpsSamples = [];
 
 const _imageCache = new Map();
 const _spriteCache = new Map();
@@ -79,13 +79,14 @@ const _mouse = {
 };
 
 const _keyboard = {
+    keyQueue: [],
     prev: {}
 };
-
 
 dl.Vector2 = (x = 0, y = 0) => ({ x, y });
 dl.Vector2Zero = (out = null) => out ? (out.x = 0, out.y = 0, out) : dl.Vector2();
 dl.Vector2FromArray = (arr, out = null) => out ? (out.x = arr[0], out.y = arr[1], out) : dl.Vector2(arr[0], arr[1]);
+dl.Vector2Floor = (v, out = null) => out ? (out.x = Math.floor(out.x), out.y = Math.floor(out.y)) : dl.Vector2(Math.floor(v.x), Math.floor(v.y));
 
 dl.Vector2Add = (v1, v2, out = null) => {
     if (out) { out.x = v1.x + v2.x; out.y = v1.y + v2.y; return out; }
@@ -168,7 +169,6 @@ dl.Vector2Reflect = (v, normal, out = null) => {
     return dl.Vector2(rx, ry);
 };
 
-
 dl.Vector2Magnitude = (v) => Math.sqrt((v.x * v.x) + (v.y * v.y));
 dl.Vector2Length = dl.Vector2Magnitude;
 
@@ -185,6 +185,7 @@ dl.Rectangle = (x, y, width, height) => ({ x, y, width, height });
 
 dl.clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 dl.lerp = (a, b, t) => a + (b - a) * t;
+dl.shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
 
 dl.isMouseInCanvas = () => _mouse.isInCanvas;
 dl.isMouseButtonDown = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && _mouse[buttonId];
@@ -195,6 +196,7 @@ dl.isKeyDown = (keyCode) => keyCode in _keyboard && _keyboard[keyCode];
 dl.isKeyUp = (keyCode) => keyCode in _keyboard && !_keyboard[keyCode];
 dl.isKeyPressed = (keyCode) => keyCode in _keyboard && !_keyboard.prev[keyCode] && _keyboard[keyCode];
 dl.isKeyReleased = (keyCode) => keyCode in _keyboard && _keyboard.prev[keyCode] && !_keyboard[keyCode];
+dl.getKeyPressed = () => _keyboard.keyQueue.length ? _keyboard.keyQueue.shift() : null;
 dl.getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 dl.getRandomFloat = (min, max) => Math.random() * (max - min) + min;
 dl.getRandomElem = (arr) => arr[dl.getRandomInt(0, arr.length - 1)];
@@ -298,7 +300,10 @@ dl.initCanvas = ({
         if (_mouse.isInCanvas) _mouse[e.button] = false;
     };
     window.onkeydown = (e) => {
-        if (e.code.length) _keyboard[e.code] = true;
+        if (!_keyboard[e.code]) {
+            _keyboard.keyQueue.push(e.code);
+        }
+        _keyboard[e.code] = true;
     };
     window.onkeyup = (e) => {
         if (e.code in _keyboard) _keyboard[e.code] = false;
@@ -419,7 +424,7 @@ dl.getRandomString = (length, options = {}) => {
 
     if (opts.excludeSimilar) pool = pool.replace(_charSets.similar, "");
 
-    if (pool.length === 0) pool = _charSets.lowercase;
+    if (pool.length == 0) pool = _charSets.lowercase;
 
     let result = "";
     for (let i = 0; i < length; ++i) {
@@ -743,7 +748,7 @@ dl.setLineThick = (thickness) => {
 const _parseColorString = (color) => {
     if (typeof color !== 'string') return null;
     if (color.startsWith("#")) {
-        if (color.length === 7) {
+        if (color.length == 7) {
             const bigint = parseInt(color.slice(1), 16);
             return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
         }
@@ -783,8 +788,6 @@ const _updateFPS = (dtMS) => {
     _avgFPS = Math.round(sum / _fpsSamples.length) || 0;
 };
 
-
-
 dl.drawFPS = (() => {
     let FPSTimer = 0;
     let lastFPS = 0;
@@ -798,8 +801,6 @@ dl.drawFPS = (() => {
         dl.drawText(`${lastFPS} FPS`, x, y, _fpsFontSize, dl.LIME);
     };
 })();
-
-
 
 dl.drawRectangle = (x, y, width, height, color) => {
     _ctx.fillStyle = color;
@@ -842,8 +843,6 @@ dl.drawRectangleLinesEx = (rect, thickness, color) => {
         _ctx.stroke();
     _ctx.restore();
 }
-
-
 
 dl.drawRectangleRounded = (x, y, width, height, roundness, color) => {
     _ctx.beginPath();
@@ -1344,7 +1343,7 @@ dl.guiButton = (bounds, text, options = {}) => {
     if (!_guiButtons.has(id)) _guiButtons.set(id, []);
     const list = _guiButtons.get(id);
 
-    let btn = list.find((b) => b.text === text);
+    let btn = list.find((b) => b.text == text);
     if (!btn) {
         btn = new dl.Button(bounds, text, options);
         list.push(btn);
@@ -1406,7 +1405,7 @@ const _loadSound = async (path) => {
 };
 
 dl.playSound = (path, volume = 1.0, pitch = 1.0) => {
-    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    if (_audioCtx.state == 'suspended') _audioCtx.resume();
 
     if (!_masterGain) {
         _masterGain = _audioCtx.createGain();
