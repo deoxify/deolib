@@ -9,6 +9,7 @@ let _ctx,
     _fpsFontSize,
     _cachedFont,
     _masterGain,
+    _guiCallIndex,
     _fpsSamples = [];
 
 const _imageCache = new Map();
@@ -24,33 +25,33 @@ dl.DEG2RAD = Math.PI / 180;
 dl.RAD2DEG = 180 / Math.PI;
 dl.FLT_EPSILON = 1.19209290E-07;
 
-dl.LIGHTGRAY = "#c8c8c8";
-dl.GRAY = "#828282";
-dl.DARKGRAY = "#505050";
-dl.COAL = "#101010";
-dl.YELLOW = "#fdf900";
-dl.GOLD = "#ffcb00";
-dl.ORANGE = "#ffa100";
-dl.PINK = "#ff6dc2";
-dl.RED = "#e62937";
-dl.MAROON = "#be2137";
-dl.GREEN = "#00e430";
-dl.LIME = "#009e2f";
-dl.DARKGREEN = "#00752c";
-dl.SKYBLUE = "#66bfff";
-dl.BLUE = "#0079f1";
-dl.DARKBLUE = "#0052ac";
-dl.PURPLE = "#c87aff";
-dl.CYAN = "#00FFFF";
-dl.VIOLET = "#873cbe";
+dl.BEIGE      = "#d3b083";
+dl.BLACK      = "#000000";
+dl.BLUE       = "#0079f1";
+dl.BROWN      = "#7f6a4f";
+dl.COAL       = "#101010";
+dl.CYAN       = "#00ffff";
+dl.DARKBLUE   = "#0052ac";
+dl.DARKBROWN  = "#4c3f2f";
+dl.DARKGRAY   = "#505050";
+dl.DARKGREEN  = "#00752c";
 dl.DARKPURPLE = "#701f7e";
-dl.BEIGE = "#d3b083";
-dl.BROWN = "#7f6a4f";
-dl.DARKBROWN = "#4c3f2f";
-dl.WHITE = "#ffffff";
-dl.BLACK = "#000000";
-dl.MAGENTA = "#ff00ff";
-dl.BLANK = "transparent";
+dl.GOLD       = "#ffcb00";
+dl.GRAY       = "#828282";
+dl.GREEN      = "#00e430";
+dl.LIGHTGRAY  = "#c8c8c8";
+dl.LIME       = "#009e2f";
+dl.MAGENTA    = "#ff00ff";
+dl.MAROON     = "#be2137";
+dl.ORANGE     = "#ffa100";
+dl.PINK       = "#ff6dc2";
+dl.PURPLE     = "#c87aff";
+dl.RED        = "#e62937";
+dl.SKYBLUE    = "#66bfff";
+dl.VIOLET     = "#873cbe";
+dl.WHITE      = "#ffffff";
+dl.YELLOW     = "#fdf900";
+dl.BLANK      = "transparent";
 
 dl.CURSOR_DEFAULT = "default";
 dl.CURSOR_CROSSHAIR = "crosshair";
@@ -86,7 +87,7 @@ const _keyboard = {
 dl.Vector2 = (x = 0, y = 0) => ({ x, y });
 dl.Vector2Zero = (out = null) => out ? (out.x = 0, out.y = 0, out) : dl.Vector2();
 dl.Vector2FromArray = (arr, out = null) => out ? (out.x = arr[0], out.y = arr[1], out) : dl.Vector2(arr[0], arr[1]);
-dl.Vector2Floor = (v, out = null) => out ? (out.x = Math.floor(out.x), out.y = Math.floor(out.y)) : dl.Vector2(Math.floor(v.x), Math.floor(v.y));
+dl.Vector2Floor = (v, out = null) => out ? (out.x = Math.floor(v.x), out.y = Math.floor(v.y)) : dl.Vector2(Math.floor(v.x), Math.floor(v.y));
 
 dl.Vector2Add = (v1, v2, out = null) => {
     if (out) { out.x = v1.x + v2.x; out.y = v1.y + v2.y; return out; }
@@ -176,7 +177,7 @@ dl.Vector2Dot = (v1, v2) => v1.x * v2.x + v1.y * v2.y;
 dl.Vector2Cross = (v1, v2) => v1.x * v2.y - v1.y * v2.x;
 dl.Vector2Distance = (v1, v2) => Math.sqrt((v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y));
 dl.Vector2DistanceSqr = (v1, v2) => (v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y);
-dl.Vector2Equals = (v1, v2) => v1.x == v2.x && v1.y == v2.y;
+dl.Vector2Equals = (v1, v2) => v1.x === v2.x && v1.y === v2.y;
 dl.Vector2Angle = (v1, v2) => v2 == undefined ? Math.atan2(v1.y, v1.x) : Math.atan2(v2.y - v1.y, v2.x - v1.x);
 dl.Vector2ToString = (v) => `Vector2(${v.x.toFixed(2)}, ${v.y.toFixed(2)})`;
 dl.Vector2IsZero = (v, threshold = 0.00001) => (Math.abs(v.x) < threshold && Math.abs(v.y) < threshold);
@@ -185,7 +186,13 @@ dl.Rectangle = (x, y, width, height) => ({ x, y, width, height });
 
 dl.clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 dl.lerp = (a, b, t) => a + (b - a) * t;
-dl.shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);
+dl.shuffleArray = (arr) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = (Math.random() * (i + 1)) | 0;
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+};
 
 dl.isMouseInCanvas = () => _mouse.isInCanvas;
 dl.isMouseButtonDown = (buttonId = dl.LEFT_MOUSE_BUTTON) => buttonId in _mouse && _mouse[buttonId];
@@ -229,7 +236,7 @@ dl.initCanvas = ({
     autoExpand = false,
     pageBgColor = "#282828",
     antiAliasing = true,
-    borderColor = "transparent"
+    borderColor = dl.BLANK
 }) => {
     const canvas = document.createElement("canvas");
     _ctx = canvas.getContext("2d");
@@ -457,7 +464,7 @@ const _loadGenericImage = (fileName, spriteWidth = null, spriteHeight = null) =>
 };
 
 dl.loadImage = (fileName) => _loadGenericImage(fileName);
-dl.loadSpreadSheet = (fileName, sw, sh) => _loadGenericImage(fileName, sw, sh);
+dl.loadSpriteSheet = (fileName, sw, sh) => _loadGenericImage(fileName, sw, sh);
 
 dl.drawSprite = (
     spriteSheet,
@@ -700,7 +707,7 @@ const _startGameLoop = (callback) => {
             _mouse.currentFrameY = _mouse.y;
             
             _updateFPS(deltaTimeMS); 
-            
+            _guiCallIndex = 0;
             callback();
 
             _updatePrevMouseState();
@@ -721,7 +728,6 @@ const _startGameLoop = (callback) => {
 dl.setTargetFPS = (fps) => {
     _targetFPS = fps;
     _targetFrameTime = fps > 0 ? (1000 / fps) : 0;
-    setTimeout(()=>{console.log(dl.getFrameTime())}, 1000);
 };
 
 const _updatePrevMouseState = () => {
@@ -770,12 +776,7 @@ const _parseColorString = (color) => {
 dl.fade = (color, alpha) => {
     const clampedAlpha = dl.clamp(alpha, 0.0, 1.0);
     const rgb = _parseColorString(color);
-    if (rgb) {
-        return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${clampedAlpha})`;
-    } else {
-        console.warn(`dl.fade: Could not parse color format: ${color}. Returning transparent black.`);
-        return `rgba(0, 0, 0, 0)`;
-    }
+    return `rgba(${rgb ? `${rgb.r}, ${rgb.g}, ${rgb.b}` : '0, 0, 0'}, ${clampedAlpha})`;
 };
 
 const _updateFPS = (dtMS) => {
@@ -982,7 +983,7 @@ dl.drawCircleLinesV = (center, radius, color) => {
 dl.drawCircleLinesEx = (center, radius, thickness, color) => {
     _ctx.save();
         _ctx.lineWidth = thickness;
-        dl.drawCircleLinesV(center.x, center.y, radius, color);
+        dl.drawCircleLinesV(center, radius, color);
     _ctx.restore();
 }
 
@@ -1070,6 +1071,7 @@ dl.setFont = (newFont) => {
     if (_cachedFont != newFont) {
         _ctx.font = newFont;
         _ctx.fillText("skill issue", -6969, -6969);
+        _cachedFont = newFont;
     }
 }
 
@@ -1199,7 +1201,7 @@ dl.Button = class {
         this.bounds = bounds;
         this.id = options.id ?? this.constructor.generateID();
         this.text = text ?? " ";
-        this.fontSize = options.fontSize || 20;
+        this.fontSize = options.fontSize || 0;
         this.style = options.style || dl.BS_DEFAULT;
         this.roundness = options.roundness || 0;
         this.isDisabled = options.disabled || false;
@@ -1224,31 +1226,41 @@ dl.Button = class {
 
     setText(newText = this.text) {
         this.text = String(newText);
-
         this.textLines = this.text.split("\n");
-        this.cachedFont = `bold ${this.fontSize || 20}px monospace, system, sans-serif`;
+
+        const fittedSize = (() => {
+            if (this.fontSize) return this.fontSize;
+            const maxW = this.innerRect.width * 0.9;
+            const maxH = this.innerRect.height * 0.9;
+            let size = Math.floor(this.bounds.height * 0.9);
+            _ctx.save();
+            _ctx.font = `bold ${size}px monospace, system, sans-serif`;
+            while (size > 6) {
+                const widest = this.textLines.reduce((max, line) =>
+                    Math.max(max, _ctx.measureText(line).width), 0);
+                if (widest <= maxW && size * 1.2 * this.textLines.length <= maxH) break;
+                _ctx.font = `bold ${--size}px monospace, system, sans-serif`;
+            }
+            _ctx.restore();
+            return size;
+        })();
+
+        this.cachedFont = `bold ${fittedSize}px monospace, system, sans-serif`;
 
         _ctx.save();
-            _ctx.font = this.cachedFont;
-            const leadingFactor = 1.8;
-            this.cachedLineHeights = this.textLines.map((line) => {
-                const metrics = _ctx.measureText(line);
-                const ascent = metrics.actualBoundingBoxAscent ?? this.fontSize * 0.8;
-                const descent = metrics.actualBoundingBoxDescent ?? this.fontSize * 0.2;
-                const baseLineHeight = ascent + descent;
-                return baseLineHeight * leadingFactor;
-            });
-        _ctx.restore();
+        _ctx.font = this.cachedFont;
 
-        const totalHeight = this.cachedLineHeights.reduce((a, b) => a + b, 0);
-        const startY = this.bounds.y + (this.bounds.height - totalHeight) / 2;
+        const lineH = fittedSize * 1.2;
+        const totalH = lineH * this.textLines.length;
+        let currentY = this.bounds.y + (this.bounds.height - totalH) / 2;
 
-        let currentY = startY;
-        this.textYOffsets = this.cachedLineHeights.map((height) => {
-            const y = currentY + (height / 2);
-            currentY += height;
-            return Math.floor(y);
+        this.textYOffsets = this.textLines.map(() => {
+            const y = Math.floor(currentY + lineH / 2);
+            currentY += lineH;
+            return y;
         });
+
+        _ctx.restore();
     }
 
     enable() {
@@ -1339,23 +1351,14 @@ dl.Button = class {
 };
 
 dl.guiButton = (bounds, text, options = {}) => {
-    const id = `x${Math.floor(bounds.x)}y${Math.floor(bounds.y)}`;
-    if (!_guiButtons.has(id)) _guiButtons.set(id, []);
-    const list = _guiButtons.get(id);
-
-    let btn = list.find((b) => b.text == text);
-    if (!btn) {
-        btn = new dl.Button(bounds, text, options);
-        list.push(btn);
-    }
-
+    const id = _guiCallIndex++;
+    if (!_guiButtons.has(id)) _guiButtons.set(id, new dl.Button(bounds, text, options));
+    const btn = _guiButtons.get(id);
+    if (btn.text !== text) btn.setText(text);
+    btn.bounds = bounds;
     btn.update();
     btn.draw();
     return btn.isPressed();
-};
-
-dl.clearGuiCache = () => {
-    _guiButtons.clear();
 };
 
 dl.openURL = (url) => {
