@@ -208,8 +208,8 @@ dl.getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + mi
 dl.getRandomFloat = (min, max) => Math.random() * (max - min) + min;
 dl.getRandomElem = (arr) => arr[dl.getRandomInt(0, arr.length - 1)];
 dl.getRandomColor = () => `#${(c => c < 0x202020 ? dl.getRandomColor().slice(1) : c.toString(16).padStart(6, '0'))((Math.random() * 0xffffff) << 0)}`;
-dl.getMousePosition = () => dl.Vector2(Math.round(_mouse.currentFrameX), Math.round(_mouse.currentFrameY));
-dl.getMouseDelta = () => dl.Vector2(_mouse.currentFrameX - _mouse.prevX, _mouse.currentFrameY - _mouse.prevY);
+dl.getMousePosition = () => dl.Vector2(Math.round(_mouse.x), Math.round(_mouse.y));
+dl.getMouseDelta = () => dl.Vector2(_mouse.x - _mouse.prevX, _mouse.y - _mouse.prevY);
 dl.getMouseWheelMove = () => {
     const move = _mouse.wheel;
     _mouse.wheel = 0;
@@ -444,23 +444,15 @@ dl.getRandomString = (length, options = {}) => {
 const _loadGenericImage = (fileName, spriteWidth = null, spriteHeight = null) => {
     if (_imageCache.has(fileName)) return _imageCache.get(fileName);
 
-    const placeholder = new Image();
     const img = new Image();
-    
-    const meta = { spriteWidth, spriteHeight };
-    Object.assign(placeholder, meta);
-
-    img.onload = () => {
-        Object.assign(img, meta);
-        _imageCache.set(fileName, img);
-        Object.assign(placeholder, { src: img.src, width: img.width, height: img.height });
-    };
-    
+    img.spriteWidth = spriteWidth;
+    img.spriteHeight = spriteHeight;
+    img.onload = () => _imageCache.set(fileName, img);
     img.onerror = err => console.error(`Failed to load: ${fileName}`, err);
     img.src = fileName;
 
-    _imageCache.set(fileName, placeholder);
-    return placeholder;
+    _imageCache.set(fileName, img);
+    return img;
 };
 
 dl.loadImage = (fileName) => _loadGenericImage(fileName);
@@ -572,27 +564,6 @@ dl.checkCollisionCircles = (center1, radius1, center2, radius2) => {
     const radiusSum = radius1 + radius2;
 
     return distanceSq <= (radiusSum * radiusSum);
-};
-
-dl.checkCollisionCircleLine = (center, radius, p1, p2) => {
-    const dx = p1.x - p2.x;
-    const dy = p1.y - p2.y;
-
-    if (Math.abs(dx) + Math.abs(dy) <= dl.FLT_EPSILON) {
-        return dl.checkCollisionCircles(p1, 0, center, radius);
-    }
-
-    const lengthSQ = dx * dx + dy * dy;
-    const dotProduct = (((center.x - p1.x) * (p2.x - p1.x)) + ((center.y - p1.y) * (p2.y - p1.y))) / lengthSQ;
-
-    if (dotProduct > 1) dotProduct = 1;
-    else if (dotProduct < 0) dotProduct = 0;
-
-    const dx2 = (p1.x - dotProduct * dx) - center.x;
-    const dy2 = (p1.y - dotProduct * dy) - center.y;
-    const distanceSQ = dx2 * dx2 + dy2 * dy2;
-
-    return distanceSQ <= radius * radius;
 };
 
 dl.checkCollisionCircleRec = (center, radius, rect) => {
@@ -723,11 +694,6 @@ const _startGameLoop = (callback) => {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     frameRef = requestAnimationFrame(loop);
-};
-
-dl.setTargetFPS = (fps) => {
-    _targetFPS = fps;
-    _targetFrameTime = fps > 0 ? (1000 / fps) : 0;
 };
 
 const _updatePrevMouseState = () => {
@@ -894,19 +860,14 @@ dl.drawSquareGrid = (x, y, cols, rows, cellSize, color = dl.LIGHTGRAY, lineThick
 }
 
 dl.drawLine = (x1, y1, x2, y2, color, lineThick) => {
+    const needsRestore = lineThick && _ctx.lineWidth !== lineThick;
+    if (needsRestore) { _ctx.save(); _ctx.lineWidth = lineThick; }
     _ctx.strokeStyle = color;
     _ctx.beginPath();
     _ctx.moveTo(x1, y1);
     _ctx.lineTo(x2, y2);
-    if (lineThick && _ctx.lineWidth !== lineThick) {
-        _ctx.save();
-        _ctx.lineWidth = lineThick;
-    }
     _ctx.stroke();
-    if (lineThick && _ctx.lineWidth !== lineThick) {
-        _ctx.restore();
-    }
-    _ctx.closePath();
+    if (needsRestore) _ctx.restore();
 }
 
 dl.drawLineStrip = (points, color) => {
@@ -1029,7 +990,7 @@ dl.drawRingLinesV = (center, innerRadius, outerRadius, color) => {
 
 dl.drawPoly = (center, sides, radius, rotation, color) => {
     if (sides < 3) return;
-    dl.drawPolyLines(center, sides, radius, rotation);
+    dl.drawPolyLines(center, sides, radius, rotation, color);
     _ctx.fillStyle = color;
     _ctx.fill();
 }
@@ -1360,6 +1321,117 @@ dl.guiButton = (bounds, text, options = {}) => {
     btn.draw();
     return btn.isPressed();
 };
+
+
+const _progressBarStyles = {
+    default: { bg: "#c9c9c9", fill: "#00e430", border: "#838383", text: null },
+    dark:    { bg: "#2c2c2c", fill: "#00e430", border: "#878787", text: null },
+    amber:   { bg: "#292929", fill: "#eb891d", border: "#898988", text: dl.WHITE },
+    genesis: { bg: "#181b1eff", fill: "#ac3c3cff", border: "#667384ff", text: null },
+    rltech:  { bg: "#ffffff", fill: "#ff0000", border: "#000000", text: null },
+    terminal:{ bg: "#161313", fill: "#38f620", border: "#1c8d00", text: null },
+};
+
+dl.PBS_DEFAULT  = _progressBarStyles.default;
+dl.PBS_DARK     = _progressBarStyles.dark;
+dl.PBS_AMBER    = _progressBarStyles.amber;
+dl.PBS_GENESIS  = _progressBarStyles.genesis;
+dl.PBS_RLTECH   = _progressBarStyles.rltech;
+dl.PBS_TERMINAL = _progressBarStyles.terminal;
+
+const _progressBars = new Map();
+
+dl.ProgressBar = class {
+    constructor(bounds, options = {}) {
+        this.bounds = bounds;
+        this.style = options.style || dl.PBS_DEFAULT;
+        this.roundness = options.roundness || 0;
+        this.borderThick = options.borderThick || Math.max(1, Math.floor((bounds.width + bounds.height) / 64));
+        this.showLabel = options.showLabel ?? false;
+        this.labelAlign = options.labelAlign || "center";
+        this.animated = options.animated ?? false;
+        this.visualValue = 0;
+
+        this.innerRect = dl.Rectangle(
+            bounds.x + this.borderThick,
+            bounds.y + this.borderThick,
+            bounds.width - this.borderThick * 2,
+            bounds.height - this.borderThick * 2
+        );
+    }
+
+    _getTextColor(fillColor) {
+        const rgb = _parseColorString(fillColor);
+        if (!rgb) return dl.WHITE;
+        const luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+        return luminance > 0.5 ? "#1a1a1a" : "#ffffff";
+    }
+
+    draw(value, min, max) {
+        const t = dl.clamp((value - min) / (max - min), 0, 1);
+
+        if (this.animated) {
+            this.visualValue = dl.lerp(this.visualValue, t, Math.min(1, _frameTime * 8));
+        } else {
+            this.visualValue = t;
+        }
+
+        const { bg, fill, border, text } = this.style;
+        const r = this.roundness;
+        const inner = this.innerRect;
+
+        if (r) {
+            dl.drawRectangleRoundedRec(this.bounds, r, border);
+            dl.drawRectangleRoundedRec(inner, r, bg);
+        } else {
+            dl.drawRectangleRec(this.bounds, border);
+            dl.drawRectangleRec(inner, bg);
+        }
+
+        if (this.visualValue > 0) {
+            const fillW = Math.round(inner.width * this.visualValue);
+            const fillRect = dl.Rectangle(inner.x, inner.y, fillW, inner.height);
+
+            _ctx.save();
+            if (r) {
+                _ctx.beginPath();
+                _ctx.roundRect(inner.x, inner.y, inner.width, inner.height, r);
+                _ctx.clip();
+            } else {
+                _ctx.beginPath();
+                _ctx.rect(inner.x, inner.y, inner.width, inner.height);
+                _ctx.clip();
+            }
+            dl.drawRectangleRec(fillRect, fill);
+            _ctx.restore();
+        }
+
+        if (this.showLabel) {
+            const pct = Math.round(this.visualValue * 100);
+            const label = `${pct}%`;
+            const fontSize = Math.floor(inner.height * 0.6);
+            const textColor = text || this._getTextColor(fill);
+
+            const padding = inner.width * 0.01;
+            let tx;
+            if (this.labelAlign === "left")        tx = inner.x + padding;
+            else if (this.labelAlign === "right")  tx = inner.x + inner.width - padding;
+            else                                   tx = inner.x + inner.width / 2;
+
+            const align = this.labelAlign === "center" ? "center" : this.labelAlign === "right" ? "right" : "left";
+            dl.drawTextEx(label, tx, inner.y + inner.height / 2, fontSize, textColor, align, "middle");
+            // dl.drawTextEx(min, inner.x + padding, inner.y + inner.height / 2, fontSize, textColor, "left", "middle");
+            // dl.drawTextEx(max, inner.x + inner.width - padding, inner.y + inner.height / 2, fontSize, textColor, "right", "middle");
+        }
+    }
+};
+
+dl.guiProgressBar = (bounds, value, min = 0, max = 1, options = {}) => {
+    const id = _guiCallIndex++;
+    if (!_progressBars.has(id)) _progressBars.set(id, new dl.ProgressBar(bounds, options));
+    _progressBars.get(id).draw(value, min, max);
+};
+
 
 dl.openURL = (url) => {
     try {
