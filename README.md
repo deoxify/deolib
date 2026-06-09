@@ -25,7 +25,7 @@ If defined, it is invoked every frame by the internal game loop, which uses [req
 ```html
 <html>
     <head>
-        <script src="https://cdn.jsdelivr.net/gh/deoxify/deolib@latest/deolib.js"></script>
+        <script src="https://cdn.jsdelivr.net/gh/deoxify/deolib@master/deolib.js"></script>
     </head>
     <body>
         <script src="script.js"></script>
